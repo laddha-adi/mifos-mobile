@@ -1,11 +1,13 @@
 package org.mifos.mobilebanking.ui.fragments;
 
+import android.animation.LayoutTransition;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Bitmap;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
@@ -34,9 +36,11 @@ import org.mifos.mobilebanking.ui.enums.AccountType;
 import org.mifos.mobilebanking.ui.enums.ChargeType;
 import org.mifos.mobilebanking.ui.fragments.base.BaseFragment;
 import org.mifos.mobilebanking.ui.views.HomeOldView;
+import org.mifos.mobilebanking.utils.CircularImageView;
 import org.mifos.mobilebanking.utils.Constants;
 import org.mifos.mobilebanking.utils.CurrencyUtil;
 import org.mifos.mobilebanking.utils.MaterialDialog;
+import org.mifos.mobilebanking.utils.TextDrawable;
 import org.mifos.mobilebanking.utils.Toaster;
 
 import javax.inject.Inject;
@@ -69,11 +73,17 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
     @BindView(R.id.iv_user_image)
     ImageView ivUserImage;
 
+    @BindView(R.id.iv_circular_user_image)
+    CircularImageView ivCircularUserImage;
+
     @BindView(R.id.tv_user_name)
     TextView tvUserName;
 
     @BindView(R.id.swipe_home_container)
     SwipeRefreshLayout slHomeContainer;
+
+    @BindView(R.id.ll_container)
+    LinearLayout llContainer;
 
     @Inject
     HomeOldPresenter presenter;
@@ -83,7 +93,6 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
 
     View rootView;
     private double totalLoanAmount, totalSavingAmount;
-    private Bitmap userProfileBitmap;
     private Client client;
     private long clientId;
     private View toolbarView;
@@ -110,6 +119,11 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
         slHomeContainer.setColorSchemeResources(R.color.blue_light, R.color.green_light, R
                 .color.orange_light, R.color.red_light);
         slHomeContainer.setOnRefreshListener(this);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            llContainer.getLayoutTransition()
+                    .enableTransitionType(LayoutTransition.CHANGING);
+        }
         if (savedInstanceState == null) {
             loadClientData();
         }
@@ -132,7 +146,7 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
         inflater.inflate(R.menu.menu_main, menu);
         MenuItem menuItem = menu.findItem(R.id.menu_notifications);
         View count = menuItem.getActionView();
-        tvNotificationCount = (TextView) count.findViewById(R.id.tv_notification_indicator);
+        tvNotificationCount = count.findViewById(R.id.tv_notification_indicator);
         presenter.getUnreadNotificationsCount();
         count.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -171,7 +185,6 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
         super.onSaveInstanceState(outState);
         outState.putDouble(Constants.TOTAL_LOAN, totalLoanAmount);
         outState.putDouble(Constants.TOTAL_SAVINGS, totalSavingAmount);
-        outState.putParcelable(Constants.USER_PROFILE, userProfileBitmap);
         outState.putParcelable(Constants.USER_DETAILS, client);
     }
 
@@ -180,7 +193,7 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
         super.onActivityCreated(savedInstanceState);
         if (savedInstanceState != null) {
             showUserDetails((Client) savedInstanceState.getParcelable(Constants.USER_DETAILS));
-            showUserImage((Bitmap) savedInstanceState.getParcelable(Constants.USER_PROFILE));
+            presenter.setUserProfile(preferencesHelper.getUserProfileImage());
             showLoanAccountDetails(savedInstanceState.getDouble(Constants.TOTAL_LOAN));
             showSavingAccountDetails(savedInstanceState.getDouble(Constants.TOTAL_SAVINGS));
         }
@@ -279,8 +292,34 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
         getActivity().runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                userProfileBitmap = bitmap;
-                ivUserImage.setImageBitmap(bitmap);
+                if (bitmap != null) {
+
+                    ivUserImage.setVisibility(View.GONE);
+                    ivCircularUserImage.setVisibility(View.VISIBLE);
+                    ivCircularUserImage.setImageBitmap(bitmap);
+
+                } else {
+
+                    String userName;
+                    if (!preferencesHelper.getUserName().isEmpty()) {
+
+                        userName = preferencesHelper.getUserName();
+                    } else {
+
+                        userName = getString(R.string.app_name);
+                    }
+                    TextDrawable drawable = TextDrawable.builder()
+                            .beginConfig()
+                            .toUpperCase()
+                            .endConfig()
+                            .buildRound(userName.substring(0, 1),
+                                    ContextCompat.getColor(
+                                            getContext(), R.color.primary));
+                    ivUserImage.setVisibility(View.VISIBLE);
+                    ivUserImage.setImageDrawable(drawable);
+                    ivCircularUserImage.setVisibility(View.GONE);
+
+                }
             }
         });
     }
@@ -296,7 +335,7 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
         }
     }
 
-    @OnClick(R.id.iv_user_image)
+    @OnClick({R.id.iv_user_image, R.id.iv_circular_user_image})
     public void userImageClicked() {
         startActivity(new Intent(getActivity(), UserProfileActivity.class));
     }
@@ -321,6 +360,7 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
      * Makes Overview state visible
      */
     private void showOverviewState() {
+        ivVisibility.setImageDrawable(getResources().getDrawable(R.drawable.ic_visibility_24px));
         ivVisibility.setColorFilter(ContextCompat.getColor(getActivity(), R.color.gray_dark));
         llAccountDetail.setVisibility(View.VISIBLE);
     }
@@ -329,6 +369,8 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
      * Hides Overview state
      */
     private void hideOverviewState() {
+        ivVisibility.setImageDrawable(getResources()
+                .getDrawable(R.drawable.ic_visibility_off_24px));
         ivVisibility.setColorFilter(ContextCompat.getColor(getActivity(), R.color.light_grey));
         llAccountDetail.setVisibility(View.GONE);
     }
@@ -407,6 +449,11 @@ public class HomeOldFragment extends BaseFragment implements HomeOldView,
      */
     @Override
     public void showError(String errorMessage) {
+        int checkedItem = ((HomeActivity) getActivity()).getCheckedItem();
+        if (checkedItem == R.id.item_about_us || checkedItem == R.id.item_help ||
+                checkedItem == R.id.item_settings) {
+            return;
+        }
         Toaster.show(rootView, errorMessage);
     }
 

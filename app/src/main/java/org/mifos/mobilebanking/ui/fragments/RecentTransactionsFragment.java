@@ -9,8 +9,9 @@ import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.TextView;
+import android.widget.Toast;
+
+import com.github.therajanmaurya.sweeterror.SweetUIErrorHandler;
 
 import org.mifos.mobilebanking.R;
 import org.mifos.mobilebanking.models.Transaction;
@@ -22,7 +23,7 @@ import org.mifos.mobilebanking.ui.views.RecentTransactionsView;
 import org.mifos.mobilebanking.utils.Constants;
 import org.mifos.mobilebanking.utils.DividerItemDecoration;
 import org.mifos.mobilebanking.utils.EndlessRecyclerViewScrollListener;
-import org.mifos.mobilebanking.utils.Toaster;
+import org.mifos.mobilebanking.utils.Network;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +32,7 @@ import javax.inject.Inject;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import butterknife.OnClick;
 
 /**
  * @author Vishwwajeet
@@ -45,13 +47,7 @@ public class RecentTransactionsFragment extends BaseFragment implements RecentTr
     @BindView(R.id.swipe_transaction_container)
     SwipeRefreshLayout swipeTransactionContainer;
 
-    @BindView(R.id.iv_status)
-    ImageView ivStatus;
-
-    @BindView(R.id.tv_status)
-    TextView tvStatus;
-
-    @BindView(R.id.ll_error)
+    @BindView(R.id.layout_error)
     View layoutError;
 
     @Inject
@@ -59,6 +55,8 @@ public class RecentTransactionsFragment extends BaseFragment implements RecentTr
 
     @Inject
     RecentTransactionListAdapter recentTransactionsListAdapter;
+
+    private SweetUIErrorHandler sweetUIErrorHandler;
 
     private View rootView;
 
@@ -85,6 +83,7 @@ public class RecentTransactionsFragment extends BaseFragment implements RecentTr
 
         ButterKnife.bind(this, rootView);
         recentTransactionsPresenter.attachView(this);
+        sweetUIErrorHandler = new SweetUIErrorHandler(getActivity(), rootView);
 
         showUserInterface();
         setToolbarTitle(getString(R.string.recent_transactions));
@@ -141,13 +140,19 @@ public class RecentTransactionsFragment extends BaseFragment implements RecentTr
      */
     @Override
     public void onRefresh() {
-        resetUI();
+        if (layoutError.getVisibility() == View.VISIBLE) {
+            resetUI();
+        }
         recentTransactionsPresenter.loadRecentTransactions(false, 0);
     }
 
+    /**
+     * Shows a Toast
+     * @param message
+     */
     @Override
     public void showMessage(String message) {
-        Toaster.show(rootView, message, Toaster.LONG);
+        ((BaseActivity) getActivity()).showToast(message);
     }
 
     /**
@@ -173,8 +178,7 @@ public class RecentTransactionsFragment extends BaseFragment implements RecentTr
 
     @Override
     public void resetUI() {
-        rvRecentTransactions.setVisibility(View.VISIBLE);
-        layoutError.setVisibility(View.GONE);
+        sweetUIErrorHandler.hideSweetErrorLayoutUI(rvRecentTransactions, layoutError);
     }
 
     /**
@@ -182,9 +186,8 @@ public class RecentTransactionsFragment extends BaseFragment implements RecentTr
      */
     @Override
     public void showEmptyTransaction() {
-        rvRecentTransactions.setVisibility(View.GONE);
-        layoutError.setVisibility(View.VISIBLE);
-        tvStatus.setText(getString(R.string.empty_transactions));
+        sweetUIErrorHandler.showSweetEmptyUI(getString(R.string.recent_transactions),
+                R.drawable.ic_label_black_24dp, rvRecentTransactions, layoutError);
     }
 
     /**
@@ -193,10 +196,22 @@ public class RecentTransactionsFragment extends BaseFragment implements RecentTr
      */
     @Override
     public void showErrorFetchingRecentTransactions(String message) {
-        showMessage(message);
-        rvRecentTransactions.setVisibility(View.GONE);
-        layoutError.setVisibility(View.VISIBLE);
-        tvStatus.setText(message);
+        if (!Network.isConnected(getActivity())) {
+            sweetUIErrorHandler.showSweetNoInternetUI(rvRecentTransactions, layoutError);
+        } else {
+            sweetUIErrorHandler.showSweetErrorUI(message, rvRecentTransactions, layoutError);
+        }
+    }
+
+    @OnClick(R.id.btn_try_again)
+    public void retryClicked() {
+        if (Network.isConnected(getContext())) {
+            sweetUIErrorHandler.hideSweetErrorLayoutUI(rvRecentTransactions, layoutError);
+            recentTransactionsPresenter.loadRecentTransactions(false, 0);
+        } else {
+            Toast.makeText(getContext(), getString(R.string.internet_not_connected),
+                    Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override

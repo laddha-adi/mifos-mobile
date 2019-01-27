@@ -3,12 +3,16 @@ package org.mifos.mobilebanking.injection.component;
 import org.mifos.mobilebanking.injection.PerActivity;
 import org.mifos.mobilebanking.injection.module.ActivityModule;
 import org.mifos.mobilebanking.ui.activities.HomeActivity;
+import org.mifos.mobilebanking.ui.activities.SplashActivity;
 import org.mifos.mobilebanking.ui.fragments.AccountOverviewFragment;
+import org.mifos.mobilebanking.ui.fragments.AddGuarantorFragment;
 import org.mifos.mobilebanking.ui.fragments.BeneficiaryAddOptionsFragment;
 import org.mifos.mobilebanking.ui.activities.PassCodeActivity;
 import org.mifos.mobilebanking.ui.fragments.BeneficiaryApplicationFragment;
 import org.mifos.mobilebanking.ui.fragments.BeneficiaryDetailFragment;
 import org.mifos.mobilebanking.ui.fragments.BeneficiaryListFragment;
+import org.mifos.mobilebanking.ui.fragments.GuarantorDetailFragment;
+import org.mifos.mobilebanking.ui.fragments.GuarantorListFragment;
 import org.mifos.mobilebanking.ui.fragments.HelpFragment;
 import org.mifos.mobilebanking.ui.fragments.HomeOldFragment;
 import org.mifos.mobilebanking.ui.fragments.LoanAccountTransactionFragment;
@@ -17,6 +21,7 @@ import org.mifos.mobilebanking.ui.fragments.LoanAccountsDetailFragment;
 import org.mifos.mobilebanking.ui.activities.LoginActivity;
 import org.mifos.mobilebanking.ui.fragments.LoanApplicationFragment;
 import org.mifos.mobilebanking.ui.fragments.NotificationFragment;
+import org.mifos.mobilebanking.ui.fragments.QrCodeImportFragment;
 import org.mifos.mobilebanking.ui.fragments.RegistrationFragment;
 import org.mifos.mobilebanking.ui.fragments.RegistrationVerificationFragment;
 import org.mifos.mobilebanking.ui.fragments.SavingAccountsDetailFragment;
@@ -102,4 +107,14 @@ public interface ActivityComponent {
     void inject(HomeOldFragment homeOldFragment);
 
     void inject(NotificationFragment notificationFragment);
+    
+    void inject(QrCodeImportFragment qrCodeImportFragment);
+
+    void inject(SplashActivity splashActivity);
+
+    void inject(AddGuarantorFragment addGuarantorFragment);
+
+    void inject(GuarantorListFragment guarantorListFragment);
+
+    void inject(GuarantorDetailFragment guarantorDetailFragment);
 }

@@ -4,12 +4,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:background="@color/white"
-    android:padding="@dimen/default_padding">
+    android:background="@color/white">
     <android.support.v4.widget.NestedScrollView
         android:id="@+id/view_flipper"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:padding="@dimen/default_padding"
+        android:scrollbars="vertical">
 
         <LinearLayout
             xmlns:android="http://schemas.android.com/apk/res/android"
@@ -29,8 +30,7 @@
                 android:layout_height="wrap_content"
                 android:paddingBottom="@dimen/default_margin"
                 android:paddingTop="@dimen/default_margin"
-                style="@style/Widget.AppCompat.Spinner.Underlined"
-                android:spinnerMode="dialog"/>
+                style="@style/Widget.AppCompat.Spinner.Underlined" />
 
             <android.support.design.widget.TextInputLayout
                 android:layout_width="match_parent"
@@ -44,6 +44,7 @@
                     android:gravity="start"
                     android:hint="@string/account_number"
                     android:imeOptions="actionNext"
+                    android:inputType="text"
                     android:maxLines="1"
                     android:paddingBottom="16dp"/>
             </android.support.design.widget.TextInputLayout>
@@ -60,6 +61,7 @@
                     android:gravity="start"
                     android:hint="@string/office_name"
                     android:imeOptions="actionNext"
+                    android:inputType="text"
                     android:maxLines="1"
                     android:paddingBottom="16dp"/>
             </android.support.design.widget.TextInputLayout>
@@ -76,8 +78,9 @@
                     android:gravity="start"
                     android:hint="@string/transfer_limit"
                     android:imeOptions="actionNext"
-                    android:inputType="numberDecimal"
+                    android:inputType="number"
                     android:maxLines="1"
+                    android:maxLength="9"
                     android:paddingBottom="16dp"/>
             </android.support.design.widget.TextInputLayout>
 
@@ -92,7 +95,8 @@
                     android:layout_height="wrap_content"
                     android:gravity="start"
                     android:hint="@string/beneficiary_name"
-                    android:imeOptions="actionNext"
+                    android:imeOptions="actionDone"
+                    android:inputType="text"
                     android:maxLines="1"
                     android:paddingBottom="16dp"/>
             </android.support.design.widget.TextInputLayout>
@@ -107,6 +111,6 @@
     </android.support.v4.widget.NestedScrollView>
     <include
         android:visibility="gone"
-        android:id="@+id/ll_error"
-        layout="@layout/layout_error"/>
+        android:id="@+id/layout_error"
+        layout="@layout/layout_sweet_exception_handler"/>
 </RelativeLayout>

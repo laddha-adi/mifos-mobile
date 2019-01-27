@@ -5,16 +5,18 @@ import android.content.Context;
 import org.mifos.mobilebanking.R;
 import org.mifos.mobilebanking.api.DataManager;
 import org.mifos.mobilebanking.injection.ApplicationContext;
-import org.mifos.mobilebanking.models.accounts.loan.LoanAccount;
+import org.mifos.mobilebanking.models.accounts.loan.LoanWithAssociations;
 import org.mifos.mobilebanking.presenters.base.BasePresenter;
 import org.mifos.mobilebanking.ui.views.LoanAccountsDetailView;
+import org.mifos.mobilebanking.utils.Constants;
 
 import javax.inject.Inject;
 
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
-import rx.subscriptions.CompositeSubscription;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.schedulers.Schedulers;
+
 
 /**
  * @author Vishwajeet
@@ -24,7 +26,7 @@ import rx.subscriptions.CompositeSubscription;
 public class LoanAccountsDetailPresenter extends BasePresenter<LoanAccountsDetailView> {
 
     private final DataManager dataManager;
-    private CompositeSubscription subscriptions;
+    private CompositeDisposable compositeDisposable;
 
     /**
      * Initialises the LoanAccountDetailsPresenter by automatically injecting an instance of
@@ -40,7 +42,7 @@ public class LoanAccountsDetailPresenter extends BasePresenter<LoanAccountsDetai
             @ApplicationContext Context context) {
         super(context);
         this.dataManager = dataManager;
-        subscriptions = new CompositeSubscription();
+        compositeDisposable = new CompositeDisposable();
     }
 
     @Override
@@ -51,7 +53,7 @@ public class LoanAccountsDetailPresenter extends BasePresenter<LoanAccountsDetai
     @Override
     public void detachView() {
         super.detachView();
-        subscriptions.clear();
+        compositeDisposable.clear();
     }
 
     /**
@@ -63,26 +65,27 @@ public class LoanAccountsDetailPresenter extends BasePresenter<LoanAccountsDetai
     public void loadLoanAccountDetails(long loanId) {
         checkViewAttached();
         getMvpView().showProgress();
-        subscriptions.add(dataManager.getLoanAccountDetails(loanId)
+        compositeDisposable.add(dataManager.getLoanWithAssociations(Constants.REPAYMENT_SCHEDULE,
+                loanId)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<LoanAccount>() {
+                .subscribeWith(new DisposableObserver<LoanWithAssociations>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
                     }
 
                     @Override
                     public void onError(Throwable e) {
                         getMvpView().hideProgress();
                         getMvpView().showErrorFetchingLoanAccountsDetail(
-                                context.getString(R.string.error_loan_account_details_loading));
+                                context.getString(R.string.loan_account_details));
                     }
 
                     @Override
-                    public void onNext(LoanAccount loanAccount) {
+                    public void onNext(LoanWithAssociations loanWithAssociations) {
                         getMvpView().hideProgress();
-                        if (loanAccount != null) {
-                            getMvpView().showLoanAccountsDetail(loanAccount);
+                        if (loanWithAssociations != null) {
+                            getMvpView().showLoanAccountsDetail(loanWithAssociations);
                         }
                     }
                 })

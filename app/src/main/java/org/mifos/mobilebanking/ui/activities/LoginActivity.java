@@ -9,7 +9,6 @@ import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import org.mifos.mobilebanking.R;
-import org.mifos.mobilebanking.api.local.PreferencesHelper;
 import org.mifos.mobilebanking.presenters.LoginPresenter;
 import org.mifos.mobilebanking.ui.activities.base.BaseActivity;
 import org.mifos.mobilebanking.ui.views.LoginView;
@@ -45,9 +44,6 @@ public class LoginActivity extends BaseActivity implements LoginView {
     @BindView(R.id.ll_login)
     LinearLayout llLogin;
 
-    @Inject
-    PreferencesHelper preferencesHelper;
-
     private String userName;
 
     @Override
@@ -58,10 +54,6 @@ public class LoginActivity extends BaseActivity implements LoginView {
         setContentView(R.layout.activity_login);
         ButterKnife.bind(this);
         loginPresenter.attachView(this);
-
-        if (!preferencesHelper.getPasscode().isEmpty()) {
-            startPassCodeActivity();
-        }
     }
 
     /**
@@ -119,6 +111,16 @@ public class LoginActivity extends BaseActivity implements LoginView {
         tilPassword.setError(error);
     }
 
+    @Override
+    public void clearUsernameError() {
+        tilUsername.setErrorEnabled(false);
+    }
+
+    @Override
+    public void clearPasswordError() {
+        tilPassword.setErrorEnabled(false);
+    }
+
     /**
      * Called when Login Button is clicked, used for logging in the user
      */
@@ -127,8 +129,6 @@ public class LoginActivity extends BaseActivity implements LoginView {
 
         final String username = tilUsername.getEditText().getEditableText().toString();
         final String password = tilPassword.getEditText().getEditableText().toString();
-        tilUsername.setErrorEnabled(false);
-        tilPassword.setErrorEnabled(false);
 
         if (Network.isConnected(this)) {
             loginPresenter.login(username, password);

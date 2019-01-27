@@ -15,6 +15,7 @@ import android.support.v4.view.ViewPager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.SearchView;
+import android.util.DisplayMetrics;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -28,6 +29,7 @@ import org.mifos.mobilebanking.models.accounts.loan.LoanAccount;
 import org.mifos.mobilebanking.models.accounts.savings.SavingAccount;
 import org.mifos.mobilebanking.models.accounts.share.ShareAccount;
 import org.mifos.mobilebanking.presenters.AccountsPresenter;
+import org.mifos.mobilebanking.ui.activities.HomeActivity;
 import org.mifos.mobilebanking.ui.activities.LoanApplicationActivity;
 import org.mifos.mobilebanking.ui.activities.base.BaseActivity;
 import org.mifos.mobilebanking.ui.adapters.CheckBoxAdapter;
@@ -135,23 +137,17 @@ public class ClientAccountsFragment extends BaseFragment implements AccountsView
             @Override
             public void onPageScrolled(int position, float positionOffset,
                     int positionOffsetPixels) {
-                getActivity().invalidateOptionsMenu();
-                fabCreateLoan.setVisibility(View.VISIBLE);
-                if (position == 0 && positionOffset == 0) {
-                    fabCreateLoan.setVisibility(View.GONE);
-                } else if (position < 1) {
-                    fabCreateLoan.setScaleX(positionOffset);
-                    fabCreateLoan.setScaleY(positionOffset);
-                } else if (position < 2) {
-                    fabCreateLoan.setScaleX(1 - positionOffset);
-                    fabCreateLoan.setScaleY(1 - positionOffset);
-                } else {
-                    fabCreateLoan.setVisibility(View.GONE);
-                }
             }
 
             @Override
             public void onPageSelected(int position) {
+                getActivity().invalidateOptionsMenu();
+                ((HomeActivity) getActivity()).hideKeyboard(getView());
+                if (position == 1) {
+                    fabCreateLoan.setVisibility(View.VISIBLE);
+                } else {
+                    fabCreateLoan.setVisibility(View.GONE);
+                }
             }
 
             @Override
@@ -315,6 +311,10 @@ public class ClientAccountsFragment extends BaseFragment implements AccountsView
             search = (SearchView) menu.findItem(R.id.menu_search_share).getActionView();
         }
 
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        getActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+        int width = displayMetrics.widthPixels;
+        search.setMaxWidth((int) (0.75 * width));
         search.setSearchableInfo(manager.getSearchableInfo(getActivity().getComponentName()));
         search.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
@@ -369,7 +369,7 @@ public class ClientAccountsFragment extends BaseFragment implements AccountsView
             if (((AccountsFragment) getChildFragmentManager().findFragmentByTag(
                     getFragmentTag(1))).getCurrentFilterList() == null) {
                 checkBoxAdapter.setStatusList(StatusUtils.
-                        getSavingsAccountStatusList(getActivity()));
+                        getLoanAccountStatusList(getActivity()));
             } else {
                 checkBoxAdapter.setStatusList(((AccountsFragment) getChildFragmentManager()
                         .findFragmentByTag(getFragmentTag(1))).getCurrentFilterList());
@@ -380,7 +380,7 @@ public class ClientAccountsFragment extends BaseFragment implements AccountsView
             if (((AccountsFragment) getChildFragmentManager().findFragmentByTag(
                     getFragmentTag(2))).getCurrentFilterList() == null) {
                 checkBoxAdapter.setStatusList(StatusUtils.
-                        getSavingsAccountStatusList(getActivity()));
+                        getShareAccountStatusList(getActivity()));
             } else {
                 checkBoxAdapter.setStatusList(((AccountsFragment) getChildFragmentManager()
                         .findFragmentByTag(getFragmentTag(2))).getCurrentFilterList());

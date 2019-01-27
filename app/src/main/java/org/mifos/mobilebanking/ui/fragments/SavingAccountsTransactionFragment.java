@@ -15,6 +15,8 @@ import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.github.therajanmaurya.sweeterror.SweetUIErrorHandler;
+
 import org.mifos.mobilebanking.R;
 import org.mifos.mobilebanking.models.accounts.savings.SavingsWithAssociations;
 import org.mifos.mobilebanking.models.accounts.savings.Transactions;
@@ -27,6 +29,7 @@ import org.mifos.mobilebanking.utils.Constants;
 import org.mifos.mobilebanking.utils.DateHelper;
 import org.mifos.mobilebanking.utils.DatePick;
 import org.mifos.mobilebanking.utils.MFDatePicker;
+import org.mifos.mobilebanking.utils.Network;
 import org.mifos.mobilebanking.utils.Toaster;
 
 import java.util.ArrayList;
@@ -49,11 +52,8 @@ public class SavingAccountsTransactionFragment extends BaseFragment
     @BindView(R.id.ll_account)
     LinearLayout layoutAccount;
 
-    @BindView(R.id.ll_error)
+    @BindView(R.id.layout_error)
     View layoutError;
-
-    @BindView(R.id.tv_status)
-    TextView tvStatus;
 
     @BindView(R.id.tv_start_date)
     TextView tvStartDate;
@@ -73,6 +73,7 @@ public class SavingAccountsTransactionFragment extends BaseFragment
     @Inject
     SavingAccountsTransactionPresenter savingAccountsTransactionPresenter;
 
+    private SweetUIErrorHandler sweetUIErrorHandler;
     private View rootView;
     private long savingsId;
     private long startDateFromPicker , endDateFromPicker;
@@ -109,6 +110,7 @@ public class SavingAccountsTransactionFragment extends BaseFragment
         ButterKnife.bind(this, rootView);
         savingAccountsTransactionPresenter.attachView(this);
 
+        sweetUIErrorHandler = new SweetUIErrorHandler(getContext(), rootView);
         showUserInterface();
         if (savedInstanceState == null) {
             savingAccountsTransactionPresenter.loadSavingsWithAssociations(savingsId);
@@ -143,7 +145,7 @@ public class SavingAccountsTransactionFragment extends BaseFragment
         rvSavingAccountsTransaction.setAdapter(transactionListAdapter);
 
         radioGroup.setOnCheckedChangeListener(this);
-        mfDatePicker = MFDatePicker.newInsance(this);
+        mfDatePicker = MFDatePicker.newInstance(this, MFDatePicker.ALL_DAYS);
     }
 
     /**
@@ -157,10 +159,16 @@ public class SavingAccountsTransactionFragment extends BaseFragment
         layoutAccount.setVisibility(View.VISIBLE);
         this.savingsWithAssociations = savingsWithAssociations;
         transactionsList = savingsWithAssociations.getTransactions();
-        transactionListAdapter.setContext(getContext());
-        transactionListAdapter.
-                setSavingAccountsTransactionList(transactionsList);
 
+        if (transactionsList.size() > 0) {
+            transactionListAdapter.setContext(getContext());
+            transactionListAdapter.
+                    setSavingAccountsTransactionList(transactionsList);
+        } else {
+            sweetUIErrorHandler.showSweetEmptyUI(getString(R.string.transactions),
+                    R.drawable.ic_compare_arrows_black_24dp, rvSavingAccountsTransaction,
+                    layoutError);
+        }
     }
 
     /**
@@ -169,9 +177,22 @@ public class SavingAccountsTransactionFragment extends BaseFragment
      */
     @Override
     public void showErrorFetchingSavingAccountsDetail(String message) {
-        layoutAccount.setVisibility(View.GONE);
-        layoutError.setVisibility(View.VISIBLE);
-        tvStatus.setText(message);
+        if (!Network.isConnected(getActivity())) {
+            sweetUIErrorHandler.showSweetNoInternetUI(rvSavingAccountsTransaction, layoutError);
+        } else {
+            sweetUIErrorHandler.showSweetErrorUI(message, rvSavingAccountsTransaction, layoutError);
+        }
+    }
+
+    @OnClick(R.id.btn_try_again)
+    public void retryClicked() {
+        if (Network.isConnected(getContext())) {
+            sweetUIErrorHandler.hideSweetErrorLayoutUI(rvSavingAccountsTransaction, layoutError);
+            savingAccountsTransactionPresenter.loadSavingsWithAssociations(savingsId);
+        } else {
+            Toast.makeText(getContext(), getString(R.string.internet_not_connected),
+                    Toast.LENGTH_SHORT).show();
+        }
     }
 
     /**
@@ -180,7 +201,7 @@ public class SavingAccountsTransactionFragment extends BaseFragment
      */
     @Override
     public void showFilteredList(List<Transactions> list) {
-        Toaster.show(rootView, getString(R.string.filterd));
+        Toaster.show(rootView, getString(R.string.filtered));
         transactionListAdapter.
                 setSavingAccountsTransactionList(list);
     }
@@ -211,7 +232,6 @@ public class SavingAccountsTransactionFragment extends BaseFragment
     @OnClick(R.id.tv_end_date)
     public void endDatePick() {
         datePick = DatePick.END;
-        mfDatePicker.isStartOrEndDate(false);
         mfDatePicker.show(getActivity().getSupportFragmentManager(), Constants
                 .DFRAG_DATE_PICKER);
     }
@@ -246,6 +266,9 @@ public class SavingAccountsTransactionFragment extends BaseFragment
 
         if (!tvStartDate.getText().equals(startDateText) && isEndDateLargeThanStartDate() &&
                 !tvEndDate.getText().equals(endDateText)) {
+            if (radioGroup.getCheckedRadioButtonId() != -1) {
+                radioGroup.clearCheck();
+            }
             filter(startDateFromPicker, endDateFromPicker);
         } else if (!isEndDateLargeThanStartDate()) {
             Toaster.show(rootView, getString(R.string.end_date_must_be_greater));
@@ -313,13 +336,14 @@ public class SavingAccountsTransactionFragment extends BaseFragment
     private void filter(long startDate , long endDate) {
 
         dummyTransactionList = new ArrayList<>(transactionsList);
-        savingAccountsTransactionPresenter.filterTransactionList(dummyTransactionList ,
-                                                                    startDate , endDate);
+        savingAccountsTransactionPresenter.filterTransactionList(dummyTransactionList,
+                                                                    startDate, endDate);
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        hideProgress();
         savingAccountsTransactionPresenter.detachView();
     }
 }

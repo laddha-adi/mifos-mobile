@@ -18,12 +18,12 @@ import org.mifos.mobilebanking.utils.MFErrorParser;
 
 import javax.inject.Inject;
 
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.plugins.RxJavaPlugins;
+import io.reactivex.schedulers.Schedulers;
 import retrofit2.HttpException;
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.plugins.RxJavaPlugins;
-import rx.schedulers.Schedulers;
-import rx.subscriptions.CompositeSubscription;
 
 /**
  * @author Vishwajeet
@@ -33,7 +33,7 @@ public class LoginPresenter extends BasePresenter<LoginView> {
 
     private final DataManager dataManager;
     private PreferencesHelper preferencesHelper;
-    private CompositeSubscription subscriptions;
+    private CompositeDisposable compositeDisposable;
 
     /**
      * Initialises the LoginPresenter by automatically injecting an instance of
@@ -49,7 +49,7 @@ public class LoginPresenter extends BasePresenter<LoginView> {
         super(context);
         this.dataManager = dataManager;
         preferencesHelper = this.dataManager.getPreferencesHelper();
-        subscriptions = new CompositeSubscription();
+        compositeDisposable = new CompositeDisposable();
     }
 
     @Override
@@ -60,7 +60,7 @@ public class LoginPresenter extends BasePresenter<LoginView> {
     @Override
     public void detachView() {
         super.detachView();
-        subscriptions.clear();
+        compositeDisposable.clear();
     }
 
     /**
@@ -77,12 +77,12 @@ public class LoginPresenter extends BasePresenter<LoginView> {
         checkViewAttached();
         if (isCredentialsValid(username, password)) {
             getMvpView().showProgress();
-            subscriptions.add(dataManager.login(username, password)
+            compositeDisposable.add(dataManager.login(username, password)
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribeOn(Schedulers.io())
-                    .subscribe(new Subscriber<User>() {
+                    .subscribeWith(new DisposableObserver<User>() {
                         @Override
-                        public void onCompleted() {
+                        public void onComplete() {
 
                         }
 
@@ -92,21 +92,27 @@ public class LoginPresenter extends BasePresenter<LoginView> {
                             String errorMessage;
                             try {
                                 if (e instanceof HttpException) {
-                                    errorMessage =
-                                            ((HttpException) e).response().errorBody().string();
-                                    getMvpView().showMessage(MFErrorParser.parseError(errorMessage)
-                                            .getDeveloperMessage());
+                                    if (((HttpException) e).code() == 503) {
+                                        getMvpView().
+                                                showMessage(context.
+                                                        getString(R.string.error_server_down));
+                                    } else {
+                                        errorMessage =
+                                                ((HttpException) e).response().errorBody().string();
+                                        getMvpView()
+                                                .showMessage(MFErrorParser.parseError(errorMessage)
+                                                .getDeveloperMessage());
+                                    }
                                 }
                             } catch (Throwable throwable) {
-                                RxJavaPlugins.getInstance().getErrorHandler().handleError(
-                                        throwable);
+                                RxJavaPlugins.getErrorHandler();
                             }
                         }
 
                         @Override
                         public void onNext(User user) {
                             if (user != null) {
-                                final String userName = user.getUserName();
+                                final String userName = user.getUsername();
                                 final long userID = user.getUserId();
                                 final String authToken = Constants.BASIC +
                                         user.getBase64EncodedAuthenticationKey();
@@ -126,12 +132,12 @@ public class LoginPresenter extends BasePresenter<LoginView> {
      */
     public void loadClient() {
         checkViewAttached();
-        subscriptions.add(dataManager.getClients()
+        compositeDisposable.add(dataManager.getClients()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<Page<Client>>() {
+                .subscribeWith(new DisposableObserver<Page<Client>>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
@@ -146,7 +152,7 @@ public class LoginPresenter extends BasePresenter<LoginView> {
                                     error_fetching_client));
                         }
                         preferencesHelper.clear();
-                        BaseApiManager.createService(preferencesHelper.getToken());
+                        reInitializeService();
                     }
 
                     @Override
@@ -156,7 +162,7 @@ public class LoginPresenter extends BasePresenter<LoginView> {
                             long clientId = clientPage.getPageItems().get(0).getId();
                             preferencesHelper.setClientId(clientId);
                             dataManager.setClientId(clientId);
-                            BaseApiManager.createService(preferencesHelper.getToken());
+                            reInitializeService();
                             getMvpView().showPassCodeActivity();
                         } else {
                             getMvpView().showMessage(context
@@ -169,35 +175,42 @@ public class LoginPresenter extends BasePresenter<LoginView> {
 
 
     private boolean isCredentialsValid(final String username, final String password) {
-
+        boolean credentialValid = true;
         final Resources resources = context.getResources();
         final String correctUsername = username.replaceFirst("\\s++$", "").trim();
         if (username == null || username.matches("\\s*") || username.isEmpty()) {
             getMvpView().showUsernameError(context.getString(R.string.error_validation_blank,
                     context.getString(R.string.username)));
-            return false;
+            credentialValid = false;
         } else if (username.length() < 5) {
             getMvpView().showUsernameError(context.getString(R.string.error_validation_minimum_chars
                     , resources.getString(R.string.username), resources.getInteger(R.integer.
                             username_minimum_length)));
-            return false;
+            credentialValid = false;
         } else if (correctUsername.contains(" ")) {
             getMvpView().showUsernameError(context.getString(
                     R.string.error_validation_cannot_contain_spaces,
-                    correctUsername, context.getString(R.string.not_contain_username)));
-            return false;
-        } else if (password == null || password.matches("\\s*") || password.isEmpty()) {
+                    resources.getString(R.string.username),
+                    context.getString(R.string.not_contain_username)));
+            credentialValid = false;
+        } else {
+            getMvpView().clearUsernameError();
+        }
+
+        if (password == null || password.isEmpty()) {
             getMvpView().showPasswordError(context.getString(R.string.error_validation_blank,
                     context.getString(R.string.password)));
-            return false;
+            credentialValid = false;
         } else if (password.length() < 6) {
             getMvpView().showPasswordError(context.getString(R.string.error_validation_minimum_chars
                     , resources.getString(R.string.password), resources.getInteger(R.integer.
                             password_minimum_length)));
-            return false;
+            credentialValid = false;
+        } else {
+            getMvpView().clearPasswordError();
         }
 
-        return true;
+        return credentialValid;
     }
 
     /**
@@ -211,7 +224,11 @@ public class LoginPresenter extends BasePresenter<LoginView> {
     private void saveAuthenticationTokenForSession(long userID, String authToken) {
         preferencesHelper.setUserId(userID);
         preferencesHelper.saveToken(authToken);
-        BaseApiManager.createService(preferencesHelper.getToken());
+        reInitializeService();
     }
 
+    private void reInitializeService() {
+        BaseApiManager.createService(preferencesHelper.getBaseUrl(), preferencesHelper.getTenant(),
+                preferencesHelper.getToken());
+    }
 }

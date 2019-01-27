@@ -32,7 +32,7 @@ public class StatusUtils {
 
     public static List<CheckboxStatus> getLoanAccountStatusList(Context context) {
         ArrayList<CheckboxStatus> arrayList = new ArrayList<>();
-        arrayList.add(new CheckboxStatus(context.getString(R.string.inArrears), ContextCompat.
+        arrayList.add(new CheckboxStatus(context.getString(R.string.in_arrears), ContextCompat.
                 getColor(context, R.color.red)));
         arrayList.add(new CheckboxStatus(context.getString(R.string.active), ContextCompat.
                 getColor(context, R.color.deposit_green)));
@@ -44,6 +44,8 @@ public class StatusUtils {
                 getColor(context, R.color.purple)));
         arrayList.add(new CheckboxStatus(context.getString(R.string.closed), ContextCompat.
                 getColor(context, R.color.black)));
+        arrayList.add(new CheckboxStatus(context.getString(R.string.withdrawn), ContextCompat.
+                getColor(context, R.color.gray_dark)));
 
         return arrayList;
     }

@@ -22,11 +22,12 @@ import java.util.List;
 
 import javax.inject.Inject;
 
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.ResponseBody;
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
-import rx.subscriptions.CompositeSubscription;
+
 
 /**
  * Created by dilpreet on 19/6/17.
@@ -35,7 +36,7 @@ import rx.subscriptions.CompositeSubscription;
 public class HomeOldPresenter extends BasePresenter<HomeOldView> {
 
     private DataManager dataManager;
-    private CompositeSubscription subscription;
+    private CompositeDisposable compositeDisposable;
     @Inject
     PreferencesHelper preferencesHelper;
 
@@ -52,7 +53,7 @@ public class HomeOldPresenter extends BasePresenter<HomeOldView> {
     public HomeOldPresenter(DataManager dataManager, @ActivityContext Context context) {
         super(context);
         this.dataManager = dataManager;
-        subscription = new CompositeSubscription();
+        compositeDisposable = new CompositeDisposable();
     }
 
     @Override
@@ -63,7 +64,7 @@ public class HomeOldPresenter extends BasePresenter<HomeOldView> {
     @Override
     public void detachView() {
         super.detachView();
-        subscription.clear();
+        compositeDisposable.clear();
     }
 
     /**
@@ -74,12 +75,12 @@ public class HomeOldPresenter extends BasePresenter<HomeOldView> {
     public void loadClientAccountDetails() {
         checkViewAttached();
         getMvpView().showProgress();
-        subscription.add(dataManager.getClientAccounts()
+        compositeDisposable.add(dataManager.getClientAccounts()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<ClientAccounts>() {
+                .subscribeWith(new DisposableObserver<ClientAccounts>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
@@ -108,12 +109,12 @@ public class HomeOldPresenter extends BasePresenter<HomeOldView> {
      */
     public void getUserDetails() {
         checkViewAttached();
-        subscription.add(dataManager.getCurrentClient()
+        compositeDisposable.add(dataManager.getCurrentClient()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<Client>() {
+                .subscribeWith(new DisposableObserver<Client>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
@@ -143,18 +144,20 @@ public class HomeOldPresenter extends BasePresenter<HomeOldView> {
      */
     public void getUserImage() {
         checkViewAttached();
-        subscription.add(dataManager.getClientImage()
+        setUserProfile(preferencesHelper.getUserProfileImage());
+
+        compositeDisposable.add(dataManager.getClientImage()
                 .observeOn(Schedulers.newThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<ResponseBody>() {
+                .subscribeWith(new DisposableObserver<ResponseBody>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
                     @Override
                     public void onError(Throwable e) {
-
+                        getMvpView().showUserImage(null);
                     }
 
                     @Override
@@ -165,13 +168,8 @@ public class HomeOldPresenter extends BasePresenter<HomeOldView> {
 
                             final String pureBase64Encoded =
                                     encodedString.substring(encodedString.indexOf(',') + 1);
-
-                            final byte[] decodedBytes =
-                                    Base64.decode(pureBase64Encoded, Base64.DEFAULT);
-
-                            Bitmap decodedBitmap = ImageUtil.getInstance().
-                                    compressImage(decodedBytes, 256, 256);
-                            getMvpView().showUserImage(decodedBitmap);
+                            preferencesHelper.setUserProfileImage(pureBase64Encoded);
+                            setUserProfile(pureBase64Encoded);
                         } catch (IOException e) {
                             Log.d("userimage", e.toString());
                         }
@@ -180,13 +178,21 @@ public class HomeOldPresenter extends BasePresenter<HomeOldView> {
         );
     }
 
+    public void setUserProfile(String image) {
+        if (image == null)
+            return;
+        final byte[] decodedBytes = Base64.decode(image, Base64.DEFAULT);
+        Bitmap decodedBitmap = ImageUtil.getInstance().compressImage(decodedBytes);
+        getMvpView().showUserImage(decodedBitmap);
+    }
+
     public void getUnreadNotificationsCount() {
-        subscription.add(dataManager.getUnreadNotificationsCount()
+        compositeDisposable.add(dataManager.getUnreadNotificationsCount()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.computation())
-                .subscribe(new Subscriber<Integer>() {
+                .subscribeWith(new DisposableObserver<Integer>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 

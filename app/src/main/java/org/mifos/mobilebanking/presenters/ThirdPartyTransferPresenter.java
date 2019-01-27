@@ -6,7 +6,9 @@ import org.mifos.mobilebanking.R;
 import org.mifos.mobilebanking.api.DataManager;
 import org.mifos.mobilebanking.injection.ApplicationContext;
 import org.mifos.mobilebanking.models.AccountOptionAndBeneficiary;
-import org.mifos.mobilebanking.models.beneficary.Beneficiary;
+import org.mifos.mobilebanking.models.beneficiary.Beneficiary;
+import org.mifos.mobilebanking.models.beneficiary.BeneficiaryDetail;
+import org.mifos.mobilebanking.models.payload.AccountDetail;
 import org.mifos.mobilebanking.models.templates.account.AccountOption;
 import org.mifos.mobilebanking.models.templates.account.AccountOptionsTemplate;
 import org.mifos.mobilebanking.presenters.base.BasePresenter;
@@ -17,14 +19,16 @@ import java.util.List;
 
 import javax.inject.Inject;
 
-import rx.Observable;
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Action1;
-import rx.functions.Func1;
-import rx.functions.Func2;
-import rx.schedulers.Schedulers;
-import rx.subscriptions.CompositeSubscription;
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.functions.BiFunction;
+import io.reactivex.functions.Consumer;
+import io.reactivex.functions.Function;
+import io.reactivex.functions.Predicate;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.schedulers.Schedulers;
+
 
 /**
  * Created by dilpreet on 21/6/17.
@@ -33,7 +37,7 @@ import rx.subscriptions.CompositeSubscription;
 public class ThirdPartyTransferPresenter extends BasePresenter<ThirdPartyTransferView> {
 
     private DataManager dataManager;
-    private CompositeSubscription subscription;
+    private CompositeDisposable compositeDisposable;
 
     /**
      * Initialises the RecentTransactionsPresenter by automatically injecting an instance of
@@ -49,7 +53,7 @@ public class ThirdPartyTransferPresenter extends BasePresenter<ThirdPartyTransfe
             @ApplicationContext Context context) {
         super(context);
         this.dataManager = dataManager;
-        subscription = new CompositeSubscription();
+        compositeDisposable = new CompositeDisposable();
     }
 
     @Override
@@ -60,7 +64,7 @@ public class ThirdPartyTransferPresenter extends BasePresenter<ThirdPartyTransfe
     @Override
     public void detachView() {
         super.detachView();
-        subscription.clear();
+        compositeDisposable.clear();
     }
 
     /**
@@ -73,12 +77,13 @@ public class ThirdPartyTransferPresenter extends BasePresenter<ThirdPartyTransfe
         checkViewAttached();
         getMvpView().showProgress();
 
-        subscription.add(Observable.zip(dataManager.getThirdPartyTransferTemplate(),
+        compositeDisposable.add(Observable.zip(dataManager.getThirdPartyTransferTemplate(),
                 dataManager.getBeneficiaryList(),
-                new Func2<AccountOptionsTemplate, List<Beneficiary>, AccountOptionAndBeneficiary>()
+                new BiFunction<AccountOptionsTemplate, List<Beneficiary>,
+                                AccountOptionAndBeneficiary>()
                 {
                     @Override
-                    public AccountOptionAndBeneficiary call(AccountOptionsTemplate
+                    public AccountOptionAndBeneficiary apply(AccountOptionsTemplate
                                                                     accountOptionsTemplate,
                                                             List<Beneficiary> beneficiaries) {
                         return new AccountOptionAndBeneficiary(accountOptionsTemplate,
@@ -87,9 +92,9 @@ public class ThirdPartyTransferPresenter extends BasePresenter<ThirdPartyTransfe
                 })
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<AccountOptionAndBeneficiary>() {
+                .subscribeWith(new DisposableObserver<AccountOptionAndBeneficiary>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
@@ -116,22 +121,32 @@ public class ThirdPartyTransferPresenter extends BasePresenter<ThirdPartyTransfe
      * @param accountOptions {@link List} of {@link AccountOption}
      * @return Returns {@link List} containing {@code accountNumbers}
      */
-    public List<String> getAccountNumbersFromAccountOptions(List<AccountOption> accountOptions) {
-        final List<String> accountNumbers = new ArrayList<>();
-        Observable.from(accountOptions)
-                .flatMap(new Func1<AccountOption, Observable<String>>() {
+    public List<AccountDetail> getAccountNumbersFromAccountOptions(List<AccountOption>
+                                                                           accountOptions) {
+        final List<AccountDetail> accountNumber = new ArrayList<>();
+        Observable.fromIterable(accountOptions)
+                .filter(new Predicate<AccountOption>() {
                     @Override
-                    public Observable<String> call(AccountOption accountOption) {
-                        return Observable.just(accountOption.getAccountNo());
+                    public boolean test(AccountOption accountOption) throws Exception {
+                        return !accountOption.getAccountType().getCode().equals(context.
+                                getString(R.string.account_type_loan));
                     }
                 })
-                .subscribe(new Action1<String>() {
+                .flatMap(new Function<AccountOption, Observable<AccountDetail>>() {
                     @Override
-                    public void call(String s) {
-                        accountNumbers.add(s);
+                    public Observable<AccountDetail> apply(AccountOption accountOption) {
+                        return Observable.just(new AccountDetail(accountOption.getAccountNo(),
+                                accountOption.getAccountType().getValue()));
+                    }
+                })
+                .subscribe(new Consumer<AccountDetail>() {
+                    @Override
+                    public void accept(AccountDetail accountDetail) throws Exception {
+                        accountNumber.add(accountDetail);
+
                     }
                 });
-        return accountNumbers;
+        return accountNumber;
     }
 
     /**
@@ -139,19 +154,22 @@ public class ThirdPartyTransferPresenter extends BasePresenter<ThirdPartyTransfe
      * @param beneficiaries {@link List} of {@link Beneficiary}
      * @return Returns {@link List} containing {@code accountNumbers}
      */
-    public List<String> getAccountNumbersFromBeneficiaries(final List<Beneficiary> beneficiaries) {
-        final List<String> accountNumbers = new ArrayList<>();
-        Observable.from(beneficiaries)
-                .flatMap(new Func1<Beneficiary, Observable<String>>() {
+    public List<BeneficiaryDetail> getAccountNumbersFromBeneficiaries(final List<Beneficiary>
+                                                                              beneficiaries) {
+        final List<BeneficiaryDetail> accountNumbers = new ArrayList<>();
+        Observable.fromIterable(beneficiaries)
+                .flatMap(new Function<Beneficiary, Observable<BeneficiaryDetail>>() {
                     @Override
-                    public Observable<String> call(Beneficiary beneficiary) {
-                        return Observable.just(beneficiary.getAccountNumber());
+                    public Observable<BeneficiaryDetail> apply(Beneficiary beneficiary) {
+                        return Observable.just(new BeneficiaryDetail(beneficiary.getAccountNumber(),
+                                beneficiary.getName()));
                     }
                 })
-                .subscribe(new Action1<String>() {
+                .subscribe(new Consumer<BeneficiaryDetail>() {
                     @Override
-                    public void call(String s) {
-                        accountNumbers.add(s);
+                    public void accept(BeneficiaryDetail beneficiaryDetail) throws Exception {
+                        accountNumbers.add(beneficiaryDetail);
+
                     }
                 });
         return accountNumbers;
@@ -168,16 +186,16 @@ public class ThirdPartyTransferPresenter extends BasePresenter<ThirdPartyTransfe
      */
     public AccountOption searchAccount(List<AccountOption> accountOptions, final String accountNo) {
         final AccountOption[] account = {new AccountOption()};
-        Observable.from(accountOptions)
-                .filter(new Func1<AccountOption, Boolean>() {
+        Observable.fromIterable(accountOptions)
+                .filter(new Predicate<AccountOption>() {
                     @Override
-                    public Boolean call(AccountOption accountOption) {
+                    public boolean test(AccountOption accountOption) {
                         return accountOption.getAccountNo().equals(accountNo);
                     }
                 })
-                .subscribe(new Action1<AccountOption>() {
+                .subscribe(new Consumer<AccountOption>() {
                     @Override
-                    public void call(AccountOption accountOption) {
+                    public void accept(AccountOption accountOption) throws Exception {
                         account[0] = accountOption;
                     }
                 });

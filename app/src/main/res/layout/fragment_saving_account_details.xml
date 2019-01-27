@@ -2,7 +2,8 @@
 <android.support.v4.widget.NestedScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_height="wrap_content"
+    android:fillViewport="true"
+    android:layout_height="match_parent"
     android:layout_width="match_parent">
 
     <LinearLayout
@@ -416,7 +417,8 @@
                 <TextView
                     android:layout_height="wrap_content"
                     android:layout_width="wrap_content"
-                    android:text="@string/need_help"/>
+                    android:text="@string/need_help"
+                    android:layout_marginRight="5dp"/>
 
                 <TextView
                     android:clickable="true"
@@ -432,8 +434,8 @@
         </LinearLayout>
 
         <include
-            layout="@layout/layout_error"
-            android:id="@+id/ll_error"
+            layout="@layout/layout_sweet_exception_handler"
+            android:id="@+id/layout_error"
             android:visibility="gone"/>
 
     </LinearLayout>

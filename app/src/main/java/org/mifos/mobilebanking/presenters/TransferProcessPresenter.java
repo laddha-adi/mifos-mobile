@@ -8,14 +8,16 @@ import org.mifos.mobilebanking.injection.ApplicationContext;
 import org.mifos.mobilebanking.models.payload.TransferPayload;
 import org.mifos.mobilebanking.presenters.base.BasePresenter;
 import org.mifos.mobilebanking.ui.views.TransferProcessView;
+import org.mifos.mobilebanking.utils.MFErrorParser;
 
 import javax.inject.Inject;
 
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.ResponseBody;
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
-import rx.subscriptions.CompositeSubscription;
+
 
 /**
  * Created by dilpreet on 1/7/17.
@@ -24,7 +26,7 @@ import rx.subscriptions.CompositeSubscription;
 public class TransferProcessPresenter extends BasePresenter<TransferProcessView> {
 
     public final DataManager dataManager;
-    public CompositeSubscription subscriptions;
+    public CompositeDisposable compositeDisposables;
 
     /**
      * Initialises the RecentTransactionsPresenter by automatically injecting an instance of
@@ -40,7 +42,7 @@ public class TransferProcessPresenter extends BasePresenter<TransferProcessView>
                                     @ApplicationContext Context context) {
         super(context);
         this.dataManager = dataManager;
-        subscriptions = new CompositeSubscription();
+        compositeDisposables = new CompositeDisposable();
     }
 
     @Override
@@ -51,7 +53,7 @@ public class TransferProcessPresenter extends BasePresenter<TransferProcessView>
     @Override
     public void detachView() {
         super.detachView();
-        subscriptions.clear();
+        compositeDisposables.clear();
     }
 
     /**
@@ -63,19 +65,19 @@ public class TransferProcessPresenter extends BasePresenter<TransferProcessView>
     public void makeSavingsTransfer(TransferPayload transferPayload) {
         checkViewAttached();
         getMvpView().showProgress();
-        subscriptions.add(dataManager.makeTransfer(transferPayload)
+        compositeDisposables.add(dataManager.makeTransfer(transferPayload)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<ResponseBody>() {
+                .subscribeWith(new DisposableObserver<ResponseBody>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
                     @Override
                     public void onError(Throwable e) {
                         getMvpView().hideProgress();
-                        getMvpView().showError(context.getString(R.string.transfer_error));
+                        getMvpView().showError(MFErrorParser.errorMessage(e));
                     }
 
                     @Override
@@ -96,12 +98,12 @@ public class TransferProcessPresenter extends BasePresenter<TransferProcessView>
     public void makeTPTTransfer(TransferPayload transferPayload) {
         checkViewAttached();
         getMvpView().showProgress();
-        subscriptions.add(dataManager.makeThirdPartyTransfer(transferPayload)
+        compositeDisposables.add(dataManager.makeThirdPartyTransfer(transferPayload)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<ResponseBody>() {
+                .subscribeWith(new DisposableObserver<ResponseBody>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 

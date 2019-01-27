@@ -10,22 +10,22 @@ import org.mifos.mobilebanking.api.DataManager;
 import org.mifos.mobilebanking.api.local.PreferencesHelper;
 import org.mifos.mobilebanking.injection.ApplicationContext;
 import org.mifos.mobilebanking.models.client.Client;
+import org.mifos.mobilebanking.models.notification.NotificationRegisterPayload;
 import org.mifos.mobilebanking.models.notification.NotificationUserDetail;
 import org.mifos.mobilebanking.presenters.base.BasePresenter;
 import org.mifos.mobilebanking.ui.views.UserDetailsView;
 import org.mifos.mobilebanking.utils.ImageUtil;
-import org.mifos.mobilebanking.models.notification.NotificationRegisterPayload;
 
 import java.io.IOException;
 
 import javax.inject.Inject;
 
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.ResponseBody;
 import retrofit2.HttpException;
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
-import rx.subscriptions.CompositeSubscription;
 
 /**
  * Created by naman on 07/04/17.
@@ -34,7 +34,7 @@ import rx.subscriptions.CompositeSubscription;
 public class UserDetailsPresenter extends BasePresenter<UserDetailsView> {
 
     private final DataManager dataManager;
-    private CompositeSubscription subscriptions;
+    private CompositeDisposable compositeDisposables;
 
     @Inject
     PreferencesHelper preferencesHelper;
@@ -52,7 +52,7 @@ public class UserDetailsPresenter extends BasePresenter<UserDetailsView> {
     public UserDetailsPresenter(@ApplicationContext Context context, DataManager dataManager) {
         super(context);
         this.dataManager = dataManager;
-        subscriptions = new CompositeSubscription();
+        compositeDisposables = new CompositeDisposable();
     }
 
     @Override
@@ -63,7 +63,7 @@ public class UserDetailsPresenter extends BasePresenter<UserDetailsView> {
     @Override
     public void detachView() {
         super.detachView();
-        subscriptions.clear();
+        compositeDisposables.clear();
     }
 
     /**
@@ -73,12 +73,12 @@ public class UserDetailsPresenter extends BasePresenter<UserDetailsView> {
      */
     public void getUserDetails() {
         checkViewAttached();
-        subscriptions.add(dataManager.getCurrentClient()
+        compositeDisposables.add(dataManager.getCurrentClient()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<Client>() {
+                .subscribeWith(new DisposableObserver<Client>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
@@ -107,12 +107,14 @@ public class UserDetailsPresenter extends BasePresenter<UserDetailsView> {
      */
     public void getUserImage() {
         checkViewAttached();
-        subscriptions.add(dataManager.getClientImage()
+        setUserProfile(preferencesHelper.getUserProfileImage());
+
+        compositeDisposables.add(dataManager.getClientImage()
                 .observeOn(Schedulers.newThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<ResponseBody>() {
+                .subscribeWith(new DisposableObserver<ResponseBody>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
@@ -131,14 +133,8 @@ public class UserDetailsPresenter extends BasePresenter<UserDetailsView> {
                             //the response is of the form of 'data:image/jpg;base64, .....'
                             final String pureBase64Encoded =
                                     encodedString.substring(encodedString.indexOf(',') + 1);
-
-                            final byte[] decodedBytes =
-                                    Base64.decode(pureBase64Encoded, Base64.DEFAULT);
-
-                            Bitmap decodedBitmap = ImageUtil.getInstance().
-                                    compressImage(decodedBytes);
-
-                            getMvpView().showUserImage(decodedBitmap);
+                            preferencesHelper.setUserProfileImage(pureBase64Encoded);
+                            setUserProfile(pureBase64Encoded);
                         } catch (IOException e) {
                             Log.e("userimage", e.getMessage());
                         }
@@ -147,16 +143,24 @@ public class UserDetailsPresenter extends BasePresenter<UserDetailsView> {
         );
     }
 
+    public void setUserProfile(String image) {
+        if (image == null)
+            return;
+        final byte[] decodedBytes = Base64.decode(image, Base64.DEFAULT);
+        Bitmap decodedBitmap = ImageUtil.getInstance().compressImage(decodedBytes);
+        getMvpView().showUserImage(decodedBitmap);
+    }
+
     public void registerNotification(final String token) {
         checkViewAttached();
         final NotificationRegisterPayload payload = new
                 NotificationRegisterPayload(preferencesHelper.getClientId(), token);
-        subscriptions.add(dataManager.registerNotification(payload)
+        compositeDisposables.add(dataManager.registerNotification(payload)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<ResponseBody>() {
+                .subscribeWith(new DisposableObserver<ResponseBody>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
@@ -179,12 +183,12 @@ public class UserDetailsPresenter extends BasePresenter<UserDetailsView> {
     private void getUserNotificationId(final NotificationRegisterPayload payload, final String
             token) {
         checkViewAttached();
-        subscriptions.add(dataManager.getUserNotificationId(preferencesHelper.getClientId())
+        compositeDisposables.add(dataManager.getUserNotificationId(preferencesHelper.getClientId())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<NotificationUserDetail>() {
+                .subscribeWith(new DisposableObserver<NotificationUserDetail>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
@@ -201,14 +205,14 @@ public class UserDetailsPresenter extends BasePresenter<UserDetailsView> {
     }
 
     private void updateRegistrationNotification(long id, NotificationRegisterPayload payload,
-                                               final String token) {
+                                                final String token) {
         checkViewAttached();
-        subscriptions.add(dataManager.updateRegisterNotification(id, payload)
+        compositeDisposables.add(dataManager.updateRegisterNotification(id, payload)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<ResponseBody>() {
+                .subscribeWith(new DisposableObserver<ResponseBody>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 

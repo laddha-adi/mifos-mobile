@@ -16,12 +16,13 @@ import java.util.List;
 
 import javax.inject.Inject;
 
-import rx.Observable;
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Func1;
-import rx.schedulers.Schedulers;
-import rx.subscriptions.CompositeSubscription;
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.functions.Predicate;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.schedulers.Schedulers;
+
 
 /**
  * Created by dilpreet on 6/3/17.
@@ -32,7 +33,7 @@ public class SavingAccountsTransactionPresenter extends
         BasePresenter<SavingAccountsTransactionView> {
 
     private final DataManager dataManager;
-    private CompositeSubscription subscriptions;
+    private CompositeDisposable compositeDisposables;
 
     /**
      * Initialises the SavingAccountsDetailPresenter by automatically injecting an instance of
@@ -48,7 +49,7 @@ public class SavingAccountsTransactionPresenter extends
                                               @ApplicationContext Context context) {
         super(context);
         this.dataManager = dataManager;
-        subscriptions = new CompositeSubscription();
+        compositeDisposables = new CompositeDisposable();
     }
 
     @Override
@@ -59,7 +60,7 @@ public class SavingAccountsTransactionPresenter extends
     @Override
     public void detachView() {
         super.detachView();
-        subscriptions.clear();
+        compositeDisposables.clear();
     }
 
     /**
@@ -71,12 +72,13 @@ public class SavingAccountsTransactionPresenter extends
     public void loadSavingsWithAssociations(long accountId) {
         checkViewAttached();
         getMvpView().showProgress();
-        subscriptions.add(dataManager.getSavingsWithAssociations(accountId, Constants.TRANSACTIONS)
+        compositeDisposables.add(dataManager.getSavingsWithAssociations(accountId,
+                                                                        Constants.TRANSACTIONS)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<SavingsWithAssociations>() {
+                .subscribeWith(new DisposableObserver<SavingsWithAssociations>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
@@ -84,7 +86,7 @@ public class SavingAccountsTransactionPresenter extends
                     public void onError(Throwable e) {
                         getMvpView().hideProgress();
                         getMvpView().showErrorFetchingSavingAccountsDetail(
-                                context.getString(R.string.error_saving_account_details_loading));
+                                context.getString(R.string.saving_account_details));
                     }
 
                     @Override
@@ -105,16 +107,16 @@ public class SavingAccountsTransactionPresenter extends
      */
     public void filterTransactionList(List<Transactions> savingAccountsTransactionList,
                                       final long startDate , final long lastDate) {
-        List<Transactions> list = Observable.from(savingAccountsTransactionList)
-                .filter(new Func1<Transactions, Boolean>() {
+        List<Transactions> list = Observable.fromIterable(savingAccountsTransactionList)
+                .filter(new Predicate<Transactions>() {
                     @Override
-                    public Boolean call(Transactions transactions) {
+                    public boolean test(Transactions transactions) {
                         return startDate <= DateHelper.getDateAsLongFromList(transactions.getDate())
                                 && lastDate >= DateHelper.
                                 getDateAsLongFromList(transactions.getDate());
                     }
                 })
-                .toList().toBlocking().single();
+                .toList().blockingGet();
 
         getMvpView().showFilteredList(list);
     }

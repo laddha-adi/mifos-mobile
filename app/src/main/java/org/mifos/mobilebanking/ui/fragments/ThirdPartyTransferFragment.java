@@ -1,34 +1,46 @@
 package org.mifos.mobilebanking.ui.fragments;
 
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentTransaction;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.support.annotation.Nullable;
 import android.support.v7.widget.AppCompatButton;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import com.github.therajanmaurya.sweeterror.SweetUIErrorHandler;
+
 import org.mifos.mobilebanking.R;
-import org.mifos.mobilebanking.models.beneficary.Beneficiary;
+import org.mifos.mobilebanking.models.beneficiary.Beneficiary;
+import org.mifos.mobilebanking.models.beneficiary.BeneficiaryDetail;
+import org.mifos.mobilebanking.models.payload.AccountDetail;
 import org.mifos.mobilebanking.models.payload.TransferPayload;
 import org.mifos.mobilebanking.models.templates.account.AccountOption;
 import org.mifos.mobilebanking.models.templates.account.AccountOptionsTemplate;
 import org.mifos.mobilebanking.presenters.ThirdPartyTransferPresenter;
 import org.mifos.mobilebanking.ui.activities.base.BaseActivity;
+import org.mifos.mobilebanking.ui.adapters.AccountsSpinnerAdapter;
+import org.mifos.mobilebanking.ui.adapters.BeneficiarySpinnerAdapter;
 import org.mifos.mobilebanking.ui.enums.TransferType;
 import org.mifos.mobilebanking.ui.fragments.base.BaseFragment;
 import org.mifos.mobilebanking.ui.views.ThirdPartyTransferView;
 import org.mifos.mobilebanking.utils.Constants;
 import org.mifos.mobilebanking.utils.DateHelper;
 import org.mifos.mobilebanking.utils.MFDatePicker;
+import org.mifos.mobilebanking.utils.Network;
 import org.mifos.mobilebanking.utils.ProcessView;
 import org.mifos.mobilebanking.utils.Toaster;
+import org.mifos.mobilebanking.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -82,11 +94,14 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
     @BindView(R.id.btn_amount)
     AppCompatButton btnAmount;
 
+    @BindView(R.id.btn_add_beneficiary)
+    AppCompatButton btnAddBeneficiary;
+
     @BindView(R.id.ll_review)
     LinearLayout llReview;
 
     @BindView(R.id.tv_select_beneficary)
-    TextView tvSelectBeneficary;
+    TextView tvSelectBeneficiary;
 
     @BindView(R.id.tv_select_amount)
     TextView tvEnterAmount;
@@ -94,25 +109,37 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
     @BindView(R.id.tv_enter_remark)
     TextView tvEnterRemark;
 
+    @BindView(R.id.tv_add_beneficiary_msg)
+    TextView tvAddBeneficiaryMsg;
+
+    @BindView(R.id.layout_error)
+    View layoutError;
+
     @Inject
     ThirdPartyTransferPresenter presenter;
 
-    private List<String> listBeneficiary = new ArrayList<>();
-    private List<String> listPayFrom = new ArrayList<>();
+    private List<BeneficiaryDetail> listBeneficiary = new ArrayList<>();
+    private List<AccountDetail> listPayFrom = new ArrayList<>();
     private List<Beneficiary> beneficiaries;
-    private ArrayAdapter<String> beneficiaryAdapter;
-    private ArrayAdapter<String> payFromAdapter;
+    private BeneficiarySpinnerAdapter beneficiaryAdapter;
+    private AccountsSpinnerAdapter payFromAdapter;
     private AccountOption fromAccountOption;
     private AccountOption beneficiaryAccountOption;
     private AccountOptionsTemplate accountOptionsTemplate;
     private String transferDate;
     private View rootView;
+    private SweetUIErrorHandler sweetUIErrorHandler;
 
     public static ThirdPartyTransferFragment newInstance() {
         ThirdPartyTransferFragment fragment = new ThirdPartyTransferFragment();
         return fragment;
     }
 
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setHasOptionsMenu(true);
+    }
 
     @Nullable
     @Override
@@ -122,7 +149,7 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
         rootView = inflater.inflate(R.layout.fragment_third_party_transfer, container, false);
         setToolbarTitle(getString(R.string.third_party_transfer));
         ButterKnife.bind(this, rootView);
-
+        sweetUIErrorHandler = new SweetUIErrorHandler(getActivity(), rootView);
         showUserInterface();
 
         presenter.attachView(this);
@@ -158,14 +185,14 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
      */
     @Override
     public void showUserInterface() {
-        payFromAdapter = new ArrayAdapter<>(getActivity(), android.R.layout.simple_spinner_item,
+        payFromAdapter = new AccountsSpinnerAdapter(getActivity(), R.layout.account_spinner_layout,
                 listPayFrom);
         payFromAdapter.setDropDownViewResource(android.R.layout.select_dialog_singlechoice);
         spPayFrom.setAdapter(payFromAdapter);
         spPayFrom.setOnItemSelectedListener(this);
 
-        beneficiaryAdapter = new ArrayAdapter<>(getActivity(), android.R.layout.simple_spinner_item,
-                listBeneficiary);
+        beneficiaryAdapter = new BeneficiarySpinnerAdapter(getActivity(),
+                R.layout.beneficiary_spinner_layout, listBeneficiary);
         beneficiaryAdapter.setDropDownViewResource(android.R.layout.select_dialog_singlechoice);
         spBeneficiary.setAdapter(beneficiaryAdapter);
         spBeneficiary.setOnItemSelectedListener(this);
@@ -192,7 +219,7 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
             return;
         }
 
-        if (etRemark.getText().toString().equals("")) {
+        if (etRemark.getText().toString().trim().equals("")) {
             Toaster.show(rootView, getString(R.string.remark_is_mandatory));
             return;
         }
@@ -238,6 +265,7 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
     @Override
     public void showThirdPartyTransferTemplate(AccountOptionsTemplate accountOptionsTemplate) {
         this.accountOptionsTemplate = accountOptionsTemplate;
+        listPayFrom.clear();
         listPayFrom.addAll(presenter.getAccountNumbersFromAccountOptions(accountOptionsTemplate.
                 getFromAccountOptions()));
         payFromAdapter.notifyDataSetChanged();
@@ -252,6 +280,7 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
     @Override
     public void showBeneficiaryList(List<Beneficiary> beneficiaries) {
         this.beneficiaries = beneficiaries;
+        listBeneficiary.clear();
         listBeneficiary.addAll(presenter.getAccountNumbersFromBeneficiaries(beneficiaries));
         beneficiaryAdapter.notifyDataSetChanged();
     }
@@ -267,10 +296,16 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
         pvTwo.setCurrentActive();
 
         btnPayFrom.setVisibility(View.GONE);
-        tvSelectBeneficary.setVisibility(View.GONE);
-        btnPayTo.setVisibility(View.VISIBLE);
-        spBeneficiary.setVisibility(View.VISIBLE);
-        spPayFrom.setEnabled(false);
+
+        tvSelectBeneficiary.setVisibility(View.GONE);
+        if (!listBeneficiary.isEmpty()) {
+            btnPayTo.setVisibility(View.VISIBLE);
+            spBeneficiary.setVisibility(View.VISIBLE);
+            spPayFrom.setEnabled(false);
+        } else {
+            tvAddBeneficiaryMsg.setVisibility(View.VISIBLE);
+            btnAddBeneficiary.setVisibility(View.VISIBLE);
+        }
     }
 
 
@@ -314,7 +349,7 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
             return;
         }
 
-        if (etAmount.getText().toString().matches("^0*")) {
+        if (Double.parseDouble(etAmount.getText().toString()) == 0) {
             showToaster(getString(R.string.amount_greater_than_zero));
             return;
         }
@@ -333,14 +368,35 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
     public void cancelTransfer() {
         getActivity().getSupportFragmentManager().popBackStack();
     }
-    
+
+    @OnClick(R.id.btn_add_beneficiary)
+    public void addBeneficiary() {
+        ((BaseActivity) getActivity()).replaceFragment(BeneficiaryAddOptionsFragment.newInstance(),
+                true, R.id.container);
+    }
+
+    @OnClick(R.id.btn_try_again)
+    public void onRetry() {
+        if (Network.isConnected(getContext())) {
+            sweetUIErrorHandler.hideSweetErrorLayoutUI(layoutMakeTransfer, layoutError);
+            presenter.loadTransferTemplate();
+        } else {
+            Toaster.show(rootView, getString(R.string.internet_not_connected));
+        }
+    }
+
     /**
      * It is called whenever any error occurs while executing a request
      * @param msg Error message that tells the user about the problem.
      */
     @Override
     public void showError(String msg) {
-        Toaster.show(rootView, msg);
+        if (!Network.isConnected(getContext())) {
+            sweetUIErrorHandler.showSweetNoInternetUI(layoutMakeTransfer, layoutError);
+        } else {
+            sweetUIErrorHandler.showSweetErrorUI(msg, layoutMakeTransfer, layoutError);
+            Toaster.show(rootView, msg);
+        }
     }
 
     @Override
@@ -381,8 +437,29 @@ public class ThirdPartyTransferFragment extends BaseFragment implements ThirdPar
     }
 
     @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+        inflater.inflate(R.menu.menu_transfer, menu);
+        Utils.setToolbarIconColor(getActivity(), menu, R.color.white);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.menu_refresh_transfer) {
+            FragmentTransaction transaction = getFragmentManager().beginTransaction();
+            Fragment currFragment = getActivity().getSupportFragmentManager()
+                    .findFragmentById(R.id.container);
+            transaction.detach(currFragment);
+            transaction.attach(currFragment);
+            transaction.commit();
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
     public void onDestroyView() {
         super.onDestroyView();
+        hideProgress();
         presenter.detachView();
     }
 }

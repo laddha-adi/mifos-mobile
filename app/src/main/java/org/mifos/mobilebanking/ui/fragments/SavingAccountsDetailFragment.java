@@ -9,6 +9,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import com.github.therajanmaurya.sweeterror.SweetUIErrorHandler;
 
 import org.mifos.mobilebanking.R;
 import org.mifos.mobilebanking.api.local.PreferencesHelper;
@@ -24,6 +27,7 @@ import org.mifos.mobilebanking.utils.CircularImageView;
 import org.mifos.mobilebanking.utils.Constants;
 import org.mifos.mobilebanking.utils.CurrencyUtil;
 import org.mifos.mobilebanking.utils.DateHelper;
+import org.mifos.mobilebanking.utils.Network;
 import org.mifos.mobilebanking.utils.QrCodeGenerator;
 import org.mifos.mobilebanking.utils.SymbolsUtils;
 import org.mifos.mobilebanking.utils.Toaster;
@@ -49,7 +53,7 @@ public class SavingAccountsDetailFragment extends BaseFragment implements Saving
     CircularImageView ivCircularStatus;
 
     @BindView(R.id.tv_total_withdrawals)
-    TextView tvTotalWithDrawals;
+    TextView tvTotalWithdrawals;
 
     @BindView(R.id.tv_min_req_bal)
     TextView tvMiniRequiredBalance;
@@ -78,11 +82,8 @@ public class SavingAccountsDetailFragment extends BaseFragment implements Saving
     @BindView(R.id.ll_account)
     LinearLayout layoutAccount;
 
-    @BindView(R.id.ll_error)
+    @BindView(R.id.layout_error)
     View layoutError;
-
-    @BindView(R.id.tv_status)
-    TextView tvStatus;
 
     @BindView(R.id.tv_minRequiredBalance)
     TextView tvMinRequiredBalanceLabel;
@@ -97,6 +98,7 @@ public class SavingAccountsDetailFragment extends BaseFragment implements Saving
     private long savingsId;
     private Status status;
     private SavingsWithAssociations savingsWithAssociations;
+    private SweetUIErrorHandler sweetUIErrorHandler;
 
     public static SavingAccountsDetailFragment newInstance(long savingsId) {
         SavingAccountsDetailFragment fragment = new SavingAccountsDetailFragment();
@@ -123,6 +125,7 @@ public class SavingAccountsDetailFragment extends BaseFragment implements Saving
         setToolbarTitle(getString(R.string.saving_account_details));
         ButterKnife.bind(this, rootView);
         savingAccountsDetailPresenter.attachView(this);
+        sweetUIErrorHandler = new SweetUIErrorHandler(getContext(), rootView);
 
         if (savedInstanceState == null) {
             savingAccountsDetailPresenter.loadSavingsWithAssociations(savingsId);
@@ -189,50 +192,60 @@ public class SavingAccountsDetailFragment extends BaseFragment implements Saving
      */
     @Override
     public void showSavingAccountsDetail(SavingsWithAssociations savingsWithAssociations) {
-        layoutAccount.setVisibility(View.VISIBLE);
-
-        String currencySymbol = savingsWithAssociations.getCurrency().getDisplaySymbol();
-        Double accountBalance = savingsWithAssociations.getSummary().getAccountBalance();
-
-        tvAccountStatus.setText(savingsWithAssociations.getClientName());
-        if (savingsWithAssociations.getMinRequiredOpeningBalance() != null) {
-            tvMiniRequiredBalance.setText(getString(R.string.string_and_string, currencySymbol,
-                    CurrencyUtil.formatCurrency(getActivity(), savingsWithAssociations.
-                    getMinRequiredOpeningBalance())));
+        if (savingsWithAssociations.getStatus().getSubmittedAndPendingApproval()) {
+            sweetUIErrorHandler.showSweetCustomErrorUI(getString(R.string.approval_pending),
+                    R.drawable.ic_assignment_turned_in_black_24dp, layoutAccount, layoutError);
         } else {
-            tvMinRequiredBalanceLabel.setVisibility(View.GONE);
-            tvMiniRequiredBalance.setVisibility(View.GONE);
+            layoutAccount.setVisibility(View.VISIBLE);
+            String currencySymbol = savingsWithAssociations.getCurrency().getDisplaySymbol();
+            Double accountBalance = savingsWithAssociations.getSummary().getAccountBalance();
+
+            tvAccountStatus.setText(savingsWithAssociations.getClientName());
+            if (savingsWithAssociations.getMinRequiredOpeningBalance() != null) {
+                tvMiniRequiredBalance.setText(getString(R.string.string_and_string, currencySymbol,
+                        CurrencyUtil.formatCurrency(getActivity(), savingsWithAssociations.
+                                getMinRequiredOpeningBalance())));
+            } else {
+                tvMinRequiredBalanceLabel.setVisibility(View.GONE);
+                tvMiniRequiredBalance.setVisibility(View.GONE);
+            }
+
+            if (savingsWithAssociations.getSummary().getTotalWithdrawals() != null) {
+                tvTotalWithdrawals.setText(getString(R.string.string_and_string, currencySymbol,
+                        CurrencyUtil.formatCurrency(getActivity(), savingsWithAssociations.
+                                getSummary().getTotalWithdrawals())));
+            } else {
+                tvTotalWithdrawals.setText(R.string.no_withdrawals);
+            }
+
+            tvAccountBalanceMain.setText(getString(R.string.string_and_string,
+                    currencySymbol, CurrencyUtil.formatCurrency(getActivity(), accountBalance)));
+            tvNominalInterestRate.setText(getString(R.string.double_and_string,
+                    savingsWithAssociations.getNominalAnnualInterestRate(), SymbolsUtils.PERCENT));
+            tvSavingAccountNumber.setText(String.valueOf(savingsWithAssociations.getAccountNo()));
+            if (savingsWithAssociations.getSummary().getTotalDeposits() != null) {
+                tvTotalDeposits.setText(getString(R.string.string_and_string, currencySymbol,
+                        CurrencyUtil.formatCurrency(getActivity(), savingsWithAssociations.
+                                getSummary().getTotalDeposits())));
+            } else {
+                tvTotalDeposits.setText(getString(R.string.not_available));
+            }
+
+            if (savingsWithAssociations.getTransactions() != null &&
+                    !savingsWithAssociations.getTransactions().isEmpty()) {
+                tvLastTransaction.setText(getString(R.string.double_and_string,
+                        savingsWithAssociations.getTransactions().get(0).getAmount(),
+                        currencySymbol));
+                tvMadeOnTransaction.setText(DateHelper.getDateAsString(
+                        savingsWithAssociations.getLastActiveTransactionDate()));
+            } else {
+                tvLastTransaction.setText(R.string.no_transaction);
+                tvMadeOnTransaction.setVisibility(View.GONE);
+                tvMadeOnTextView.setVisibility(View.GONE);
+            }
+            showAccountStatus(savingsWithAssociations);
         }
-
-        if (savingsWithAssociations.getSummary().getTotalWithdrawals() != null) {
-            tvTotalWithDrawals.setText(getString(R.string.string_and_string, currencySymbol,
-                    CurrencyUtil.formatCurrency(getActivity(), savingsWithAssociations.
-                            getSummary().getTotalWithdrawals())));
-        } else {
-            tvTotalWithDrawals.setText(R.string.no_withdrawals);
-        }
-
-        tvAccountBalanceMain.setText(getString(R.string.string_and_string,
-                currencySymbol, CurrencyUtil.formatCurrency(getActivity(), accountBalance)));
-        tvNominalInterestRate.setText(getString(R.string.double_and_String,
-                savingsWithAssociations.getNominalAnnualInterestRate(), SymbolsUtils.PERCENT));
-        tvSavingAccountNumber.setText(String.valueOf(savingsWithAssociations.getAccountNo()));
-        tvTotalDeposits.setText(getString(R.string.string_and_double,
-                currencySymbol , savingsWithAssociations.getSummary().getTotalDeposits()));
-
-        if (!savingsWithAssociations.getTransactions().isEmpty()) {
-            tvLastTransaction.setText(getString(R.string.double_and_String,
-                    savingsWithAssociations.getTransactions().get(0).getAmount(), currencySymbol));
-            tvMadeOnTransaction.setText(DateHelper.getDateAsString(
-                    savingsWithAssociations.getLastActiveTransactionDate()));
-        } else {
-            tvLastTransaction.setText(R.string.no_transaction);
-            tvMadeOnTransaction.setVisibility(View.GONE);
-            tvMadeOnTextView.setVisibility(View.GONE);
-        }
-
         this.savingsWithAssociations = savingsWithAssociations;
-        showAccountStatus(savingsWithAssociations);
     }
 
     /**
@@ -241,9 +254,25 @@ public class SavingAccountsDetailFragment extends BaseFragment implements Saving
      */
     @Override
     public void showErrorFetchingSavingAccountsDetail(String message) {
-        layoutAccount.setVisibility(View.GONE);
-        layoutError.setVisibility(View.VISIBLE);
-        tvStatus.setText(message);
+        if (!Network.isConnected(getContext())) {
+            sweetUIErrorHandler.showSweetNoInternetUI(layoutAccount, layoutError);
+            Toast.makeText(getContext(), getString(R.string.internet_not_connected),
+                    Toast.LENGTH_SHORT).show();
+        } else {
+            sweetUIErrorHandler.showSweetErrorUI(message, layoutAccount, layoutError);
+            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @OnClick(R.id.btn_try_again)
+    void onRetry() {
+        if (!Network.isConnected(getContext())) {
+            Toast.makeText(getContext(), getString(R.string.internet_not_connected),
+                    Toast.LENGTH_SHORT).show();
+        } else {
+            sweetUIErrorHandler.hideSweetErrorLayoutUI(layoutAccount, layoutError);
+            savingAccountsDetailPresenter.loadSavingsWithAssociations(savingsId);
+        }
     }
 
     /**

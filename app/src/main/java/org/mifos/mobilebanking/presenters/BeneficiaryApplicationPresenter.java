@@ -1,23 +1,24 @@
 package org.mifos.mobilebanking.presenters;
 
 import android.content.Context;
+import android.view.View;
 
 import org.mifos.mobilebanking.R;
 import org.mifos.mobilebanking.api.DataManager;
 import org.mifos.mobilebanking.injection.ApplicationContext;
-import org.mifos.mobilebanking.models.beneficary.BeneficiaryPayload;
-import org.mifos.mobilebanking.models.beneficary.BeneficiaryUpdatePayload;
+import org.mifos.mobilebanking.models.beneficiary.BeneficiaryPayload;
+import org.mifos.mobilebanking.models.beneficiary.BeneficiaryUpdatePayload;
 import org.mifos.mobilebanking.models.templates.beneficiary.BeneficiaryTemplate;
 import org.mifos.mobilebanking.presenters.base.BasePresenter;
 import org.mifos.mobilebanking.ui.views.BeneficiaryApplicationView;
 
 import javax.inject.Inject;
 
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.ResponseBody;
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
-import rx.subscriptions.CompositeSubscription;
 
 /**
  * Created by dilpreet on 16/6/17.
@@ -26,7 +27,7 @@ import rx.subscriptions.CompositeSubscription;
 public class BeneficiaryApplicationPresenter extends BasePresenter<BeneficiaryApplicationView> {
 
     private DataManager dataManager;
-    private CompositeSubscription subscription;
+    private CompositeDisposable compositeDisposable;
 
     /**
      * Initialises the LoginPresenter by automatically injecting an instance of
@@ -42,13 +43,13 @@ public class BeneficiaryApplicationPresenter extends BasePresenter<BeneficiaryAp
                                            @ApplicationContext Context context) {
         super(context);
         this.dataManager = dataManager;
-        subscription = new CompositeSubscription();
+        compositeDisposable = new CompositeDisposable();
     }
 
     @Override
     public void detachView() {
         super.detachView();
-        subscription.clear();
+        compositeDisposable.clear();
     }
 
     /**
@@ -57,14 +58,15 @@ public class BeneficiaryApplicationPresenter extends BasePresenter<BeneficiaryAp
      */
     public void loadBeneficiaryTemplate() {
         checkViewAttached();
+        getMvpView().setVisibility(View.GONE);
         getMvpView().showProgress();
-        subscription.add(dataManager.getBeneficiaryTemplate()
+        compositeDisposable.add(dataManager.getBeneficiaryTemplate()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<BeneficiaryTemplate>() {
+                .subscribeWith(new DisposableObserver<BeneficiaryTemplate>() {
                     @Override
-                    public void onCompleted() {
-
+                    public void onComplete() {
+                        getMvpView().setVisibility(View.VISIBLE);
                     }
 
                     @Override
@@ -90,12 +92,12 @@ public class BeneficiaryApplicationPresenter extends BasePresenter<BeneficiaryAp
     public void createBeneficiary(BeneficiaryPayload payload) {
         checkViewAttached();
         getMvpView().showProgress();
-        subscription.add(dataManager.createBeneficiary(payload)
+        compositeDisposable.add(dataManager.createBeneficiary(payload)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<ResponseBody>() {
+                .subscribeWith(new DisposableObserver<ResponseBody>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 
@@ -124,12 +126,12 @@ public class BeneficiaryApplicationPresenter extends BasePresenter<BeneficiaryAp
     public void updateBeneficiary(long beneficiaryId, BeneficiaryUpdatePayload payload) {
         checkViewAttached();
         getMvpView().showProgress();
-        subscription.add(dataManager.updateBeneficiary(beneficiaryId, payload)
+        compositeDisposable.add(dataManager.updateBeneficiary(beneficiaryId, payload)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<ResponseBody>() {
+                .subscribeWith(new DisposableObserver<ResponseBody>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
 
                     }
 

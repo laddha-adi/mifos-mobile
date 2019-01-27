@@ -12,7 +12,7 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import org.mifos.mobilebanking.R;
-import org.mifos.mobilebanking.models.beneficary.Beneficiary;
+import org.mifos.mobilebanking.models.beneficiary.Beneficiary;
 import org.mifos.mobilebanking.presenters.BeneficiaryDetailPresenter;
 import org.mifos.mobilebanking.ui.activities.base.BaseActivity;
 import org.mifos.mobilebanking.ui.enums.BeneficiaryState;
@@ -182,6 +182,7 @@ public class BeneficiaryDetailFragment extends BaseFragment implements Beneficia
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        hideProgress();
         presenter.detachView();
     }
 }

@@ -8,8 +8,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mifos.mobilebanking.api.DataManager;
-import org.mifos.mobilebanking.models.beneficary.BeneficiaryPayload;
-import org.mifos.mobilebanking.models.beneficary.BeneficiaryUpdatePayload;
+import org.mifos.mobilebanking.models.beneficiary.BeneficiaryPayload;
+import org.mifos.mobilebanking.models.beneficiary.BeneficiaryUpdatePayload;
 import org.mifos.mobilebanking.models.templates.beneficiary.BeneficiaryTemplate;
 import org.mifos.mobilebanking.presenters.BeneficiaryApplicationPresenter;
 import org.mifos.mobilebanking.ui.views.BeneficiaryApplicationView;
@@ -17,8 +17,8 @@ import org.mifos.mobilebanking.util.RxSchedulersOverrideRule;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import io.reactivex.Observable;
 import okhttp3.ResponseBody;
-import rx.Observable;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;

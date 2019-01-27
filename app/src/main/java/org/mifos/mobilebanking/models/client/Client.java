@@ -2,8 +2,11 @@ package org.mifos.mobilebanking.models.client;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+
 import com.google.gson.annotations.SerializedName;
+
 import org.mifos.mobilebanking.models.Timeline;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -268,9 +271,9 @@ public class Client implements Parcelable {
         this.accountNo = in.readString();
         this.status = in.readParcelable(Status.class.getClassLoader());
         this.active = (Boolean) in.readValue(Boolean.class.getClassLoader());
-        this.activationDate = new ArrayList<Integer>();
+        this.activationDate = new ArrayList<>();
         in.readList(this.activationDate, Integer.class.getClassLoader());
-        this.dobDate = new ArrayList<Integer>();
+        this.dobDate = new ArrayList<>();
         in.readList(this.dobDate, Integer.class.getClassLoader());
         this.firstname = in.readString();
         this.middlename = in.readString();

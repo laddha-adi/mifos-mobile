@@ -11,10 +11,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-import android.widget.RelativeLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import org.mifos.mobilebanking.R;
+import org.mifos.mobilebanking.api.local.PreferencesHelper;
 import org.mifos.mobilebanking.models.client.Client;
 import org.mifos.mobilebanking.models.client.Group;
 import org.mifos.mobilebanking.presenters.UserDetailsPresenter;
@@ -31,6 +32,8 @@ import javax.inject.Inject;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+
+import com.github.therajanmaurya.sweeterror.SweetUIErrorHandler;
 
 /**
  * Created by dilpreet on 10/7/17.
@@ -55,7 +58,7 @@ public class UserProfileFragment extends BaseFragment implements UserDetailsView
     TextView tvGroups;
 
     @BindView(R.id.tv_client_type)
-    TextView tvCLientType;
+    TextView tvClientType;
 
     @BindView(R.id.tv_client_classification)
     TextView tvClientClassification;
@@ -78,15 +81,22 @@ public class UserProfileFragment extends BaseFragment implements UserDetailsView
     @BindView(R.id.toolbar)
     Toolbar toolbar;
 
-    @BindView(R.id.rl_error)
-    RelativeLayout rlError;
+    @BindView(R.id.layout_error)
+    View layoutError;
+
+    @BindView(R.id.ll_user_profile)
+    LinearLayout llUserProfile;
 
     @Inject
     UserDetailsPresenter presenter;
 
+    @Inject
+    PreferencesHelper preferencesHelper;
+
     private View rootView;
     private Bitmap userBitmap;
     private Client client;
+    private SweetUIErrorHandler sweetUIErrorHandler;
 
     public static UserProfileFragment newInstance() {
         UserProfileFragment fragment = new UserProfileFragment();
@@ -96,7 +106,7 @@ public class UserProfileFragment extends BaseFragment implements UserDetailsView
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+            @Nullable Bundle savedInstanceState) {
         rootView = inflater.inflate(R.layout.fragment_user_profile, container, false);
         ((BaseActivity) getActivity()).getActivityComponent().inject(this);
         ButterKnife.bind(this, rootView);
@@ -109,6 +119,7 @@ public class UserProfileFragment extends BaseFragment implements UserDetailsView
                 R.color.white));
         collapsingToolbarLayout.setExpandedTitleColor(ContextCompat.getColor(getActivity(),
                 R.color.white));
+        sweetUIErrorHandler = new SweetUIErrorHandler(getActivity(), rootView);
         if (savedInstanceState == null) {
             presenter.getUserDetails();
             presenter.getUserImage();
@@ -119,7 +130,6 @@ public class UserProfileFragment extends BaseFragment implements UserDetailsView
     @Override
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        outState.putParcelable(Constants.USER_PROFILE, userBitmap);
         outState.putParcelable(Constants.USER_DETAILS, client);
     }
 
@@ -128,14 +138,14 @@ public class UserProfileFragment extends BaseFragment implements UserDetailsView
         super.onActivityCreated(savedInstanceState);
         if (savedInstanceState != null) {
             client = savedInstanceState.getParcelable(Constants.USER_DETAILS);
-            userBitmap = savedInstanceState.getParcelable(Constants.USER_PROFILE);
-            showUserImage(userBitmap);
+            presenter.setUserProfile(preferencesHelper.getUserProfileImage());
             showUserDetails(client);
         }
     }
 
     /**
      * Sets client basic details which are fetched from server
+     *
      * @param client instance of {@link Client} which contains information about client
      */
     @Override
@@ -145,20 +155,32 @@ public class UserProfileFragment extends BaseFragment implements UserDetailsView
         tvAccountNumber.setText(client.getAccountNo());
         tvActivationDate.setText(DateHelper.getDateAsString(client.getActivationDate()));
         tvOfficeName.setText(client.getOfficeName());
-        tvCLientType.setText(client.getClientType().getName());
+        tvClientType.setText(client.getClientType().getName());
         tvGroups.setText(getGroups(client.getGroups()));
         tvClientClassification.setText(client.getClientClassification().getName());
         tvPhoneNumber.setText(client.getMobileNo());
-        tvDOB.setText(DateHelper.getDateAsString(client.getDobDate()));
+        if (client.getDobDate().size() != 3) {  // no data entry in database for the client
+            tvDOB.setText(getString(R.string.no_dob_found));
+        } else {
+            tvDOB.setText(DateHelper.getDateAsString(client.getDobDate()));
+        }
         tvGender.setText(client.getGender().getName());
     }
 
     /**
      * Generate a string for groups which the client is part of.
+     *
      * @param groups {@link List} of {@link Group} which client is a part of.
      * @return Returns String of groups
      */
     private String getGroups(List<Group> groups) {
+        if (groups.size() == 0) {
+            return getString(
+                    R.string.not_assigned_with_any_group); // no groups entry in database for the
+            // client
+        }
+
+
         StringBuilder builder = new StringBuilder();
         for (Group group : groups) {
             builder.append(getString(R.string.string_and_string, group.getName(), " | "));
@@ -168,6 +190,7 @@ public class UserProfileFragment extends BaseFragment implements UserDetailsView
 
     /**
      * Provides with client Image fetched from the server in {@code bitmap}
+     *
      * @param bitmap User Image
      */
     @Override
@@ -183,13 +206,14 @@ public class UserProfileFragment extends BaseFragment implements UserDetailsView
 
     /**
      * It is called whenever any error occurs while executing a request
+     *
      * @param message Error message that tells the user about the problem.
      */
     @Override
     public void showError(String message) {
         Toaster.show(rootView, message);
-        appBarLayout.setVisibility(View.GONE);
-        rlError.setVisibility(View.VISIBLE);
+        sweetUIErrorHandler.showSweetCustomErrorUI(getString(R.string.error_fetching_user_profile),
+                R.drawable.ic_assignment_turned_in_black_24dp, appBarLayout, layoutError);
     }
 
     @Override
@@ -205,6 +229,7 @@ public class UserProfileFragment extends BaseFragment implements UserDetailsView
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        hideProgress();
         presenter.detachView();
     }
 }

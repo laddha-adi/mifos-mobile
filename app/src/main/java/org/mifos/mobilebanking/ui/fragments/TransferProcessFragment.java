@@ -1,5 +1,6 @@
 package org.mifos.mobilebanking.ui.fragments;
 
+import android.graphics.drawable.Animatable;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.widget.AppCompatButton;
@@ -13,6 +14,7 @@ import android.widget.TextView;
 import org.mifos.mobilebanking.R;
 import org.mifos.mobilebanking.models.payload.TransferPayload;
 import org.mifos.mobilebanking.presenters.TransferProcessPresenter;
+import org.mifos.mobilebanking.ui.activities.SavingsAccountContainerActivity;
 import org.mifos.mobilebanking.ui.activities.base.BaseActivity;
 import org.mifos.mobilebanking.ui.enums.TransferType;
 import org.mifos.mobilebanking.ui.fragments.base.BaseFragment;
@@ -45,6 +47,9 @@ public class TransferProcessFragment extends BaseFragment implements TransferPro
 
     @BindView(R.id.tv_date)
     TextView tvDate;
+
+    @BindView(R.id.tv_remark)
+    TextView tvRemark;
 
     @BindView(R.id.iv_success)
     ImageView ivSuccess;
@@ -103,6 +108,7 @@ public class TransferProcessFragment extends BaseFragment implements TransferPro
         tvPayFrom.setText(String.valueOf(payload.getFromAccountId()));
         tvPayTo.setText(String.valueOf(payload.getToAccountId()));
         tvDate.setText(payload.getTransferDate());
+        tvRemark.setText(payload.getTransferDescription());
 
         return rootView;
     }
@@ -152,10 +158,12 @@ public class TransferProcessFragment extends BaseFragment implements TransferPro
      */
     @Override
     public void showTransferredSuccessfully() {
-        Toaster.show(rootView, getString(R.string.transferred_Successfully));
+        Toaster.show(rootView, getString(R.string.transferred_successfully));
         ivSuccess.setVisibility(View.VISIBLE);
+        ((Animatable) ivSuccess.getDrawable()).start();
         btnClose.setVisibility(View.VISIBLE);
         llTransfer.setVisibility(View.GONE);
+        SavingsAccountContainerActivity.transferSuccess = true;
     }
 
     /**

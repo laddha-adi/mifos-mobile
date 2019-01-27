@@ -5,6 +5,7 @@ import android.content.Context;
 import org.mifos.mobilebanking.R;
 import org.mifos.mobilebanking.api.DataManager;
 import org.mifos.mobilebanking.injection.ApplicationContext;
+import org.mifos.mobilebanking.models.payload.AccountDetail;
 import org.mifos.mobilebanking.models.templates.account.AccountOption;
 import org.mifos.mobilebanking.models.templates.account.AccountOptionsTemplate;
 import org.mifos.mobilebanking.presenters.base.BasePresenter;
@@ -15,13 +16,15 @@ import java.util.List;
 
 import javax.inject.Inject;
 
-import rx.Observable;
-import rx.Subscriber;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Action1;
-import rx.functions.Func1;
-import rx.schedulers.Schedulers;
-import rx.subscriptions.CompositeSubscription;
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.functions.Consumer;
+import io.reactivex.functions.Function;
+import io.reactivex.functions.Predicate;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.schedulers.Schedulers;
+
 
 /**
  * Created by Rajan Maurya on 10/03/17.
@@ -29,7 +32,7 @@ import rx.subscriptions.CompositeSubscription;
 public class SavingsMakeTransferPresenter extends BasePresenter<SavingsMakeTransferMvpView> {
 
     public final DataManager dataManager;
-    public CompositeSubscription subscriptions;
+    public CompositeDisposable compositeDisposables;
 
     /**
      * Initialises the RecentTransactionsPresenter by automatically injecting an instance of
@@ -45,7 +48,7 @@ public class SavingsMakeTransferPresenter extends BasePresenter<SavingsMakeTrans
             @ApplicationContext Context context) {
         super(context);
         this.dataManager = dataManager;
-        subscriptions = new CompositeSubscription();
+        compositeDisposables = new CompositeDisposable();
     }
 
     @Override
@@ -56,7 +59,7 @@ public class SavingsMakeTransferPresenter extends BasePresenter<SavingsMakeTrans
     @Override
     public void detachView() {
         super.detachView();
-        subscriptions.clear();
+        compositeDisposables.clear();
     }
 
     /**
@@ -66,12 +69,12 @@ public class SavingsMakeTransferPresenter extends BasePresenter<SavingsMakeTrans
     public void loanAccountTransferTemplate() {
         checkViewAttached();
         getMvpView().showProgress();
-        subscriptions.add(dataManager.getAccountTransferTemplate()
+        compositeDisposables.add(dataManager.getAccountTransferTemplate()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe(new Subscriber<AccountOptionsTemplate>() {
+                .subscribeWith(new DisposableObserver<AccountOptionsTemplate>() {
                     @Override
-                    public void onCompleted() {
+                    public void onComplete() {
                     }
 
                     @Override
@@ -95,19 +98,30 @@ public class SavingsMakeTransferPresenter extends BasePresenter<SavingsMakeTrans
      * @param accountOptions {@link List} of {@link AccountOption}
      * @return Returns {@link List} containing {@code accountNo}
      */
-    public List<String> getAccountNumbers(List<AccountOption> accountOptions) {
-        final List<String> accountNumber = new ArrayList<>();
-        Observable.from(accountOptions)
-                .flatMap(new Func1<AccountOption, Observable<String>>() {
+    public List<AccountDetail> getAccountNumbers(List<AccountOption> accountOptions,
+                                                 final boolean isTypePayFrom) {
+        final List<AccountDetail> accountNumber = new ArrayList<>();
+        Observable.fromIterable(accountOptions)
+                .filter(new Predicate<AccountOption>() {
                     @Override
-                    public Observable<String> call(AccountOption accountOption) {
-                        return Observable.just(accountOption.getAccountNo());
+                    public boolean test(AccountOption accountOption) throws Exception {
+                        return !(accountOption.getAccountType().getCode().equals(context.
+                                getString(R.string.account_type_loan))
+                                && isTypePayFrom);
                     }
                 })
-                .subscribe(new Action1<String>() {
+                .flatMap(new Function<AccountOption, Observable<AccountDetail>>() {
                     @Override
-                    public void call(String accountNo) {
-                        accountNumber.add(accountNo);
+                    public Observable<AccountDetail> apply(AccountOption accountOption) {
+                        return Observable.just(new AccountDetail(accountOption.getAccountNo(),
+                                accountOption.getAccountType().getValue()));
+                    }
+                })
+                .subscribe(new Consumer<AccountDetail>() {
+                    @Override
+                    public void accept(AccountDetail accountDetail) throws Exception {
+                        accountNumber.add(accountDetail);
+
                     }
                 });
         return accountNumber;
@@ -123,17 +137,18 @@ public class SavingsMakeTransferPresenter extends BasePresenter<SavingsMakeTrans
      */
     public AccountOption searchAccount(List<AccountOption> accountOptions, final long accountId) {
         final AccountOption[] accountOption = {new AccountOption()};
-        Observable.from(accountOptions)
-                .filter(new Func1<AccountOption, Boolean>() {
+        Observable.fromIterable(accountOptions)
+                .filter(new Predicate<AccountOption>() {
                     @Override
-                    public Boolean call(AccountOption accountOption) {
+                    public boolean test(AccountOption accountOption) {
                         return (accountId == accountOption.getAccountId());
                     }
                 })
-                .subscribe(new Action1<AccountOption>() {
+                .subscribe(new Consumer<AccountOption>() {
                     @Override
-                    public void call(AccountOption account) {
+                    public void accept(AccountOption account) throws Exception {
                         accountOption[0] = account;
+
                     }
                 });
         return accountOption[0];

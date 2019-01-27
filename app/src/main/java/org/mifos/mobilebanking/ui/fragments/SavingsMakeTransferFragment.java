@@ -2,31 +2,41 @@ package org.mifos.mobilebanking.ui.fragments;
 
 import android.os.Bundle;
 import android.support.annotation.Nullable;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentTransaction;
 import android.support.v7.widget.AppCompatButton;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 
 import org.mifos.mobilebanking.R;
+import org.mifos.mobilebanking.models.payload.AccountDetail;
 import org.mifos.mobilebanking.models.payload.TransferPayload;
 import org.mifos.mobilebanking.models.templates.account.AccountOption;
 import org.mifos.mobilebanking.models.templates.account.AccountOptionsTemplate;
 import org.mifos.mobilebanking.presenters.SavingsMakeTransferPresenter;
 import org.mifos.mobilebanking.ui.activities.base.BaseActivity;
+import org.mifos.mobilebanking.ui.adapters.AccountsSpinnerAdapter;
 import org.mifos.mobilebanking.ui.enums.TransferType;
 import org.mifos.mobilebanking.ui.fragments.base.BaseFragment;
 import org.mifos.mobilebanking.ui.views.SavingsMakeTransferMvpView;
 import org.mifos.mobilebanking.utils.Constants;
 import org.mifos.mobilebanking.utils.DateHelper;
 import org.mifos.mobilebanking.utils.MFDatePicker;
+import org.mifos.mobilebanking.utils.Network;
 import org.mifos.mobilebanking.utils.ProcessView;
 import org.mifos.mobilebanking.utils.Toaster;
+import org.mifos.mobilebanking.utils.Utils;
+
+import com.github.therajanmaurya.sweeterror.SweetUIErrorHandler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +46,8 @@ import javax.inject.Inject;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
+
+import static org.mifos.mobilebanking.ui.activities.base.BaseActivity.hideKeyboard;
 
 /**
  * Created by Rajan Maurya on 10/03/17.
@@ -91,23 +103,27 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
     @BindView(R.id.ll_make_transfer)
     LinearLayout layoutMakeTransfer;
 
+    @BindView(R.id.layout_error)
+    View layoutError;
+
     @Inject
     SavingsMakeTransferPresenter savingsMakeTransferPresenter;
 
     View rootView;
 
-    private List<String> listPayTo = new ArrayList<>();
-    private List<String> listPayFrom = new ArrayList<>();
+    private List<AccountDetail> listPayTo = new ArrayList<>();
+    private List<AccountDetail> listPayFrom = new ArrayList<>();
 
-    private ArrayAdapter<String> payToAdapter;
-    private ArrayAdapter<String> payFromAdapter;
+    private AccountsSpinnerAdapter payToAdapter;
+    private AccountsSpinnerAdapter payFromAdapter;
 
     private TransferPayload transferPayload;
     private String transferDate;
     private AccountOption toAccountOption, fromAccountOption;
     private AccountOptionsTemplate accountOptionsTemplate;
-    private String transferType;
+    private String transferType, payTo, payFrom;
     private long accountId;
+    private SweetUIErrorHandler sweetUIErrorHandler;
 
     /**
      * Provides an instance of {@link SavingsMakeTransferFragment}, use {@code transferType} as
@@ -134,6 +150,7 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
             accountId = getArguments().getLong(Constants.ACCOUNT_ID);
             transferType = getArguments().getString(Constants.TRANSFER_TYPE);
         }
+        setHasOptionsMenu(true);
     }
 
     @Override
@@ -144,7 +161,7 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
         setToolbarTitle(getString(R.string.transfer));
         ButterKnife.bind(this, rootView);
         savingsMakeTransferPresenter.attachView(this);
-
+        sweetUIErrorHandler = new SweetUIErrorHandler(getActivity(), rootView);
         showUserInterface();
         if (savedInstanceState == null) {
             savingsMakeTransferPresenter.loanAccountTransferTemplate();
@@ -174,7 +191,7 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
     @OnClick(R.id.btn_review_transfer)
     void reviewTransfer() {
 
-        if (etRemark.getText().toString().equals("")) {
+        if (etRemark.getText().toString().trim().equals("")) {
             showToaster(getString(R.string.remark_is_mandatory));
             return;
         }
@@ -192,7 +209,7 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
         transferPayload.setTransferAmount(Double.parseDouble(etAmount.getText().toString()));
         transferPayload.setTransferDescription(etRemark.getText().toString());
 
-
+        hideKeyboard(getActivity());
         ((BaseActivity) getActivity()).replaceFragment(TransferProcessFragment.
                 newInstance(transferPayload, TransferType.SELF), true, R.id.container);
     }
@@ -205,20 +222,30 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
         getActivity().getSupportFragmentManager().popBackStack();
     }
 
+    @OnClick(R.id.btn_try_again)
+    void onRetry() {
+        if (Network.isConnected(getContext())) {
+            sweetUIErrorHandler.hideSweetErrorLayoutUI(layoutMakeTransfer, layoutError);
+            savingsMakeTransferPresenter.loanAccountTransferTemplate();
+        } else {
+            Toaster.show(rootView, getString(R.string.internet_not_connected));
+        }
+    }
+
     /**
      * Setting up basic components
      */
     @Override
     public void showUserInterface() {
         pvOne.setCurrentActive();
-        payFromAdapter = new ArrayAdapter<>(getActivity(), android.R.layout.simple_spinner_item,
+        payFromAdapter = new AccountsSpinnerAdapter(getActivity(), R.layout.account_spinner_layout,
                 listPayFrom);
         payFromAdapter.setDropDownViewResource(android.R.layout.select_dialog_singlechoice);
         spPayFrom.setAdapter(payFromAdapter);
         spPayFrom.setOnItemSelectedListener(this);
 
-        payToAdapter = new ArrayAdapter<>(getActivity(), android.R.layout.simple_spinner_item,
-                listPayTo);
+        payToAdapter = new AccountsSpinnerAdapter(getActivity(), R.layout.account_spinner_layout,
+            listPayTo);
         payToAdapter.setDropDownViewResource(android.R.layout.select_dialog_singlechoice);
         spPayTo.setAdapter(payToAdapter);
         spPayTo.setOnItemSelectedListener(this);
@@ -234,10 +261,12 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
     @Override
     public void showSavingsAccountTemplate(AccountOptionsTemplate accountOptionsTemplate) {
         this.accountOptionsTemplate = accountOptionsTemplate;
+        listPayFrom.clear();
         listPayFrom.addAll(savingsMakeTransferPresenter.getAccountNumbers(
-                accountOptionsTemplate.getFromAccountOptions()));
+                accountOptionsTemplate.getFromAccountOptions(), true));
+        listPayTo.clear();
         listPayTo.addAll(savingsMakeTransferPresenter.getAccountNumbers(
-                accountOptionsTemplate.getToAccountOptions()));
+                accountOptionsTemplate.getToAccountOptions(), false));
         payToAdapter.notifyDataSetChanged();
         payFromAdapter.notifyDataSetChanged();
     }
@@ -257,7 +286,12 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
      */
     @Override
     public void showError(String message) {
-        Toaster.show(rootView, message);
+        if (!Network.isConnected(getContext())) {
+            sweetUIErrorHandler.showSweetNoInternetUI(layoutMakeTransfer, layoutError);
+        } else {
+            sweetUIErrorHandler.showSweetErrorUI(message, layoutMakeTransfer, layoutError);
+            Toaster.show(rootView, message);
+        }
     }
 
     @Override
@@ -294,9 +328,11 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
         switch (parent.getId()) {
             case R.id.sp_pay_to:
                 toAccountOption = accountOptionsTemplate.getToAccountOptions().get(position);
+                payTo = toAccountOption.getAccountNo();
                 break;
             case R.id.sp_pay_from:
                 fromAccountOption = accountOptionsTemplate.getFromAccountOptions().get(position);
+                payFrom = fromAccountOption.getAccountNo();
                 break;
         }
 
@@ -352,7 +388,7 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
      */
     @OnClick(R.id.btn_pay_from)
     public void payFromSelected() {
-        if (spPayTo.getSelectedItem().toString().equals(spPayFrom.getSelectedItem().toString())) {
+        if (payTo.equals(payFrom)) {
             showToaster(getString(R.string.error_same_account_transfer));
             return;
         }
@@ -384,7 +420,7 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
             return;
         }
 
-        if (etAmount.getText().toString().matches("^0*")) {
+        if (Double.parseDouble(etAmount.getText().toString()) == 0) {
             showToaster(getString(R.string.amount_greater_than_zero));
             return;
         }
@@ -397,6 +433,26 @@ public class SavingsMakeTransferFragment extends BaseFragment implements
         etRemark.setVisibility(View.VISIBLE);
         llReview.setVisibility(View.VISIBLE);
         etAmount.setEnabled(false);
+    }
+
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+        inflater.inflate(R.menu.menu_transfer, menu);
+        Utils.setToolbarIconColor(getActivity(), menu, R.color.white);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.menu_refresh_transfer) {
+            FragmentTransaction transaction = getFragmentManager().beginTransaction();
+            Fragment currFragment = getActivity().getSupportFragmentManager()
+                    .findFragmentById(R.id.container);
+            transaction.detach(currFragment);
+            transaction.attach(currFragment);
+            transaction.commit();
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override

@@ -31,6 +31,7 @@
                 android:background="@drawable/scrim"/>
             <android.support.v7.widget.Toolbar
                 android:id="@+id/toolbar"
+                app:title="@string/blank"
                 android:layout_height="?attr/actionBarSize"
                 android:layout_width="match_parent"
                 android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
@@ -48,7 +49,8 @@
         <LinearLayout
             android:layout_height="match_parent"
             android:layout_width="match_parent"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:id="@+id/ll_user_profile">
 
             <android.support.v7.widget.CardView
                 android:background="@color/white"
@@ -209,8 +211,8 @@
     </android.support.v4.widget.NestedScrollView>
 
     <include
-        layout="@layout/layout_error"
-        android:id="@+id/rl_error"
+        layout="@layout/layout_sweet_exception_handler"
+        android:id="@+id/layout_error"
         android:visibility="gone"/>
 
 </android.support.design.widget.CoordinatorLayout>

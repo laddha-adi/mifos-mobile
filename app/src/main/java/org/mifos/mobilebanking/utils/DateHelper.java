@@ -6,8 +6,10 @@
 package org.mifos.mobilebanking.utils;
 
 import android.util.Log;
+
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -24,6 +26,17 @@ public class DateHelper {
 
     public static final String FORMAT_dd_MMMM_yyyy = "dd MMMM yyyy";
 
+    public static List<Integer> getCurrentDate(String dateFormat, String separator) {
+        List<Integer> date = new ArrayList<>();
+
+        String s = new SimpleDateFormat(dateFormat, Locale.getDefault()).format(new Date());
+        for (String str : s.split(separator)) {
+            date.add(Integer.parseInt(str));
+        }
+
+        return date;
+    }
+
     /**
      * the result string uses the list given in a reverse order ([x, y, z] results in "z y x")
      *
@@ -33,14 +46,14 @@ public class DateHelper {
     public static String getDateAsString(List<Integer> integersOfDate) {
 
         StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append(integersOfDate.get(2))
-                .append(' ')
-                .append(getMonthName(integersOfDate.get(1)))
-                .append(' ')
-                .append(integersOfDate.get(0));
-
+        if (integersOfDate != null) {
+            stringBuilder.append(integersOfDate.get(2))
+                    .append(' ')
+                    .append(getMonthName(integersOfDate.get(1)))
+                    .append(' ')
+                    .append(integersOfDate.get(0));
+        }
         return stringBuilder.toString();
-
     }
 
     public static String getDateAsString(List<Integer> integersOfDate, String pattern) {
@@ -51,7 +64,8 @@ public class DateHelper {
 
     /**
      * This Method converting the dd-MM-yyyy format type date string into dd MMMM yyyy
-     * @param format Final Format of date string
+     *
+     * @param format     Final Format of date string
      * @param dateString date string
      * @return dd MMMM yyyy format date string.
      */
@@ -68,7 +82,7 @@ public class DateHelper {
     }
 
     public static String getFormatConverter(String currentFormat, String requiredFormat,
-                                            String dateString) {
+            String dateString) {
         SimpleDateFormat pickerFormat = new SimpleDateFormat(currentFormat, Locale.ENGLISH);
         SimpleDateFormat finalFormat = new SimpleDateFormat(requiredFormat, Locale.ENGLISH);
         Date date = null;
@@ -134,7 +148,7 @@ public class DateHelper {
         try {
             date = sdf.parse(dateStr);
         } catch (ParseException e) {
-            Log.d("TAG", e.getMessage().toString());
+            Log.d("TAG", e.getMessage());
         }
         return date.getTime();
     }

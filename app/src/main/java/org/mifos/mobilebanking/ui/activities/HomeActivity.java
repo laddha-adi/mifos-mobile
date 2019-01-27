@@ -20,6 +20,7 @@ import android.support.v7.app.ActionBarDrawerToggle;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -39,7 +40,6 @@ import org.mifos.mobilebanking.ui.fragments.HelpFragment;
 import org.mifos.mobilebanking.ui.fragments.HomeOldFragment;
 import org.mifos.mobilebanking.ui.fragments.NotificationFragment;
 import org.mifos.mobilebanking.ui.fragments.RecentTransactionsFragment;
-import org.mifos.mobilebanking.ui.fragments.SettingsFragment;
 import org.mifos.mobilebanking.ui.fragments.ThirdPartyTransferFragment;
 import org.mifos.mobilebanking.ui.views.UserDetailsView;
 import org.mifos.mobilebanking.utils.CircularImageView;
@@ -62,7 +62,7 @@ import butterknife.ButterKnife;
  * @since 14/07/2016
  */
 public class HomeActivity extends BaseActivity implements UserDetailsView, NavigationView.
-        OnNavigationItemSelectedListener, SettingsFragment.LanguageCallback, View.OnClickListener {
+        OnNavigationItemSelectedListener, View.OnClickListener {
 
     @BindView(R.id.navigation_view)
     NavigationView navigationView;
@@ -84,6 +84,7 @@ public class HomeActivity extends BaseActivity implements UserDetailsView, Navig
     private Client client;
     private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
     private boolean isReceiverRegistered;
+    private int menuItem;
     boolean  doubleBackToExitPressedOnce = false;
 
     public void onCreate(Bundle savedInstanceState) {
@@ -110,8 +111,7 @@ public class HomeActivity extends BaseActivity implements UserDetailsView, Navig
             showUserImage(null);
         } else {
             client = savedInstanceState.getParcelable(Constants.USER_DETAILS);
-            userProfileBitmap = savedInstanceState.getParcelable(Constants.USER_PROFILE);
-            showUserImage(userProfileBitmap);
+            detailsPresenter.setUserProfile(preferencesHelper.getUserProfileImage());
             showUserDetails(client);
         }
 
@@ -126,7 +126,6 @@ public class HomeActivity extends BaseActivity implements UserDetailsView, Navig
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        outState.putParcelable(Constants.USER_PROFILE, userProfileBitmap);
         outState.putParcelable(Constants.USER_DETAILS, client);
     }
 
@@ -157,6 +156,7 @@ public class HomeActivity extends BaseActivity implements UserDetailsView, Navig
         // select which item to open
         clearFragmentBackStack();
         setToolbarElevation();
+        menuItem = item.getItemId();
         switch (item.getItemId()) {
             case R.id.item_home:
                 hideToolbarElevation();
@@ -181,7 +181,7 @@ public class HomeActivity extends BaseActivity implements UserDetailsView, Navig
                 replaceFragment(BeneficiaryListFragment.newInstance(), true, R.id.container);
                 break;
             case R.id.item_settings:
-                replaceFragment(SettingsFragment.newInstance(this), true, R.id.container);
+                startActivity(new Intent(HomeActivity.this, SettingsActivity.class));
                 break;
             case R.id.item_about_us:
                 replaceFragment(AboutUsFragment.newInstance(), true, R.id.container);
@@ -204,16 +204,7 @@ public class HomeActivity extends BaseActivity implements UserDetailsView, Navig
         // close the drawer
         drawerLayout.closeDrawer(GravityCompat.START);
         setNavigationViewSelectedItem(R.id.item_home);
-        setTitle(item.getTitle());
         return true;
-    }
-
-
-    @Override
-    public void updateNavDrawer() {
-        //update drawer
-        navigationView.getMenu().clear();
-        navigationView.inflateMenu(R.menu.menu_nav_drawer);
     }
 
     /**
@@ -234,7 +225,13 @@ public class HomeActivity extends BaseActivity implements UserDetailsView, Navig
                                 finish();
                             }
                         })
-                .setNegativeButton(getString(R.string.cancel))
+                .setNegativeButton(getString(R.string.cancel),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                setNavigationViewSelectedItem(R.id.item_home);
+                            }
+                        })
                 .createMaterialDialog()
                 .show();
     }
@@ -258,6 +255,7 @@ public class HomeActivity extends BaseActivity implements UserDetailsView, Navig
             @Override
             public void onDrawerOpened(View drawerView) {
                 super.onDrawerOpened(drawerView);
+                hideKeyboard(drawerView);
             }
         };
         drawerLayout.addDrawerListener(actionBarDrawerToggle);
@@ -461,5 +459,16 @@ public class HomeActivity extends BaseActivity implements UserDetailsView, Navig
             detailsPresenter.registerNotification(token);
         }
     };
+
+    public int getCheckedItem() {
+        return menuItem;
+    }
+
+    public void hideKeyboard(View view) {
+        InputMethodManager inputManager = (InputMethodManager) this
+                .getSystemService(Context.INPUT_METHOD_SERVICE);
+        inputManager.hideSoftInputFromWindow(view.getWindowToken(), InputMethodManager
+                .RESULT_UNCHANGED_SHOWN);
+    }
 
 }

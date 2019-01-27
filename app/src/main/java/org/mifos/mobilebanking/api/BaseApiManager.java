@@ -1,9 +1,11 @@
 package org.mifos.mobilebanking.api;
 
+import org.mifos.mobilebanking.api.local.PreferencesHelper;
 import org.mifos.mobilebanking.api.services.AuthenticationService;
 import org.mifos.mobilebanking.api.services.BeneficiaryService;
 import org.mifos.mobilebanking.api.services.ClientChargeService;
 import org.mifos.mobilebanking.api.services.ClientService;
+import org.mifos.mobilebanking.api.services.GuarantorService;
 import org.mifos.mobilebanking.api.services.LoanAccountsListService;
 import org.mifos.mobilebanking.api.services.NotificationService;
 import org.mifos.mobilebanking.api.services.RecentTransactionsService;
@@ -11,8 +13,10 @@ import org.mifos.mobilebanking.api.services.RegistrationService;
 import org.mifos.mobilebanking.api.services.SavingAccountsListService;
 import org.mifos.mobilebanking.api.services.ThirdPartyTransferService;
 
+import javax.inject.Inject;
+
 import retrofit2.Retrofit;
-import retrofit2.adapter.rxjava.RxJavaCallAdapterFactory;
+import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
 
 /**
@@ -20,9 +24,6 @@ import retrofit2.converter.gson.GsonConverterFactory;
  * @since 13/6/16
  */
 public class BaseApiManager {
-
-    private static BaseURL baseUrl = new BaseURL();
-    private static final String BASE_URL = baseUrl.getUrl();
 
     private static Retrofit retrofit;
     private static AuthenticationService authenticationApi;
@@ -35,10 +36,12 @@ public class BaseApiManager {
     private static ThirdPartyTransferService thirdPartyTransferApi;
     private static RegistrationService registrationApi;
     private static NotificationService notificationApi;
+    private static GuarantorService guarantorService;
 
-    public BaseApiManager() {
-        String authToken = "";
-        createService(authToken);
+    @Inject
+    public BaseApiManager(PreferencesHelper preferencesHelper) {
+        createService(preferencesHelper.getBaseUrl(), preferencesHelper.getTenant(),
+                preferencesHelper.getToken());
     }
 
     private static void init() {
@@ -52,19 +55,19 @@ public class BaseApiManager {
         thirdPartyTransferApi = createApi(ThirdPartyTransferService.class);
         registrationApi = createApi(RegistrationService.class);
         notificationApi = createApi(NotificationService.class);
+        guarantorService = createApi(GuarantorService.class);
     }
 
     private static <T> T createApi(Class<T> clazz) {
         return retrofit.create(clazz);
     }
 
-    public static void createService(String authToken) {
-
+    public static void createService(String endpoint, String tenant, String authToken) {
         retrofit = new Retrofit.Builder()
-                .baseUrl(BASE_URL)
+                .baseUrl(new BaseURL().getUrl(endpoint))
                 .addConverterFactory(GsonConverterFactory.create())
-                .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
-                .client(new SelfServiceOkHttpClient(authToken).getMifosOkHttpClient())
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+                .client(new SelfServiceOkHttpClient(tenant, authToken).getMifosOkHttpClient())
                 .build();
         init();
     }
@@ -107,5 +110,9 @@ public class BaseApiManager {
 
     public NotificationService getNotificationApi() {
         return notificationApi;
+    }
+
+    public GuarantorService getGuarantorApi() {
+        return guarantorService;
     }
 }

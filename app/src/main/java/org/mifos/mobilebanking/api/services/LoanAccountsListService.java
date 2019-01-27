@@ -8,6 +8,7 @@ import org.mifos.mobilebanking.models.payload.LoansPayload;
 import org.mifos.mobilebanking.models.templates.loans.LoanTemplate;
 import org.mifos.mobilebanking.utils.Constants;
 
+import io.reactivex.Observable;
 import okhttp3.ResponseBody;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
@@ -15,7 +16,6 @@ import retrofit2.http.POST;
 import retrofit2.http.PUT;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
-import rx.Observable;
 
 /**
  * @author Vishwajeet
@@ -47,6 +47,6 @@ public interface LoanAccountsListService {
                                               @Body LoansPayload loansPayload);
 
     @POST(ApiEndPoints.LOANS + "/{loanId}?command=withdrawnByApplicant")
-    Observable<ResponseBody> withdrawLoanAccount(@Path(Constants.LOAN_ID) long loanid,
+    Observable<ResponseBody> withdrawLoanAccount(@Path(Constants.LOAN_ID) long loanId,
                                                  @Body LoanWithdraw loanWithdraw);
 }

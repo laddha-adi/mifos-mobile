@@ -16,6 +16,7 @@ import org.mifos.mobilebanking.presenters.RegistrationPresenter;
 import org.mifos.mobilebanking.ui.activities.base.BaseActivity;
 import org.mifos.mobilebanking.ui.fragments.base.BaseFragment;
 import org.mifos.mobilebanking.ui.views.RegistrationView;
+import org.mifos.mobilebanking.utils.Network;
 import org.mifos.mobilebanking.utils.Toaster;
 
 import javax.inject.Inject;
@@ -85,7 +86,7 @@ public class RegistrationFragment extends BaseFragment implements RegistrationVi
 
         if (areFieldsValidated()) {
 
-            RadioButton radioButton = (RadioButton) rootView.findViewById(rgVerificationMode.
+            RadioButton radioButton =  rootView.findViewById(rgVerificationMode.
                     getCheckedRadioButtonId());
 
             RegisterPayload payload = new RegisterPayload();
@@ -97,48 +98,74 @@ public class RegistrationFragment extends BaseFragment implements RegistrationVi
             payload.setMobileNumber(etPhoneNumber.getText().toString());
             if (!etPassword.getText().toString().equals(etConfirmPassword.getText().toString())) {
                 Toaster.show(rootView, getString(R.string.error_password_not_match));
+                return;
             } else {
                 payload.setPassword(etPassword.getText().toString());
             }
             payload.setPassword(etPassword.getText().toString());
-            payload.setUsername(etUsername.getText().toString());
+            payload.setUsername(etUsername.getText().toString().replace(" ", ""));
 
-            presenter.registerUser(payload);
+            if (Network.isConnected(getContext())) {
+                presenter.registerUser(payload);
+            } else {
+                Toaster.show(rootView, getString(R.string.no_internet_connection));
+            }
         }
 
     }
 
     private boolean areFieldsValidated() {
 
-        if (etAccountNumber.getText().length() == 0) {
+        if (etAccountNumber.getText().toString().trim().length() == 0) {
             Toaster.show(rootView, getString(R.string.error_validation_blank, getString(R.string.
                     account_number)));
             return false;
-        } else if (etUsername.getText().length() == 0) {
+        } else if (etUsername.getText().toString().trim().length() == 0) {
             Toaster.show(rootView, getString(R.string.error_validation_blank, getString(R.string.
                     username)));
+            return false;
+        } else if (etUsername.getText().toString().trim().length() < 5) {
+            Toaster.show(rootView, getString(R.string.error_validation_minimum_chars,
+                    getString(R.string.username),
+                    getResources().getInteger(R.integer.username_minimum_length)));
+            return false;
+        } else if (etUsername.getText().toString().trim().contains(" ")) {
+            Toaster.show(rootView, getString(R.string.error_validation_cannot_contain_spaces,
+                    getString(R.string.username), getString(R.string.not_contain_username)));
             return false;
         } else if (etFirstName.getText().length() == 0) {
             Toaster.show(rootView, getString(R.string.error_validation_blank, getString(R.string.
                     first_name)));
             return false;
-        } else if (etLastName.getText().length() == 0) {
+        } else if (etLastName.getText().toString().trim().length() == 0) {
             Toaster.show(rootView, getString(R.string.error_validation_blank, getString(R.string.
                     last_name)));
             return false;
-        } else if (etEmail.getText().length() == 0) {
+        } else if (etEmail.getText().toString().trim().length() == 0) {
             Toaster.show(rootView, getString(R.string.error_validation_blank, getString(R.string.
                     email)));
             return false;
-        } else if (etPassword.getText().length() == 0) {
+        } else if (etPassword.getText().toString().trim().length() == 0) {
             Toaster.show(rootView, getString(R.string.error_validation_blank, getString(R.string.
                     password)));
             return false;
-        } else if (etUsername.getText().length() < 6) {
+        } else if (etPassword.getText().toString().trim().length()
+                                        < etPassword.getText().toString().length()) {
+            Toaster.show(rootView,
+                    getString(R.string.error_validation_cannot_contain_leading_or_trailing_spaces,
+                    getString(R.string.password)));
+            return false;
+        } else if (etUsername.getText().toString().trim().length() < 6) {
             Toaster.show(rootView, getString(R.string.error_username_greater_than_six));
             return false;
-        } else if (!Patterns.EMAIL_ADDRESS.matcher( etEmail.getText().toString()).matches()) {
+        } else if (!Patterns.EMAIL_ADDRESS.matcher( etEmail.getText().toString().trim())
+                .matches()) {
             Toaster.show(rootView, getString(R.string.error_invalid_email));
+            return false;
+        } else if (etPassword.getText().toString().trim().length() < 6) {
+            Toaster.show(rootView, getString(R.string.error_validation_minimum_chars,
+                        getString(R.string.password), getResources().
+                            getInteger(R.integer.password_minimum_length)));
             return false;
         }
 

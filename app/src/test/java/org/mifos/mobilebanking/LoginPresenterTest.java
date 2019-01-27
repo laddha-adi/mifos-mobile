@@ -7,6 +7,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mifos.mobilebanking.api.BaseURL;
 import org.mifos.mobilebanking.api.DataManager;
 import org.mifos.mobilebanking.api.local.PreferencesHelper;
 import org.mifos.mobilebanking.models.Page;
@@ -18,7 +19,8 @@ import org.mifos.mobilebanking.util.RxSchedulersOverrideRule;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
-import rx.Observable;
+
+import io.reactivex.Observable;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -52,6 +54,7 @@ public class LoginPresenterTest {
     @Before
     public void setUp() throws Exception {
 
+        when(mockHelper.getBaseUrl()).thenReturn(BaseURL.PROTOCOL_HTTPS + BaseURL.API_ENDPOINT);
         when(dataManager.getPreferencesHelper()).thenReturn(mockHelper);
 
         presenter = new LoginPresenter(dataManager, context);
@@ -69,7 +72,7 @@ public class LoginPresenterTest {
         presenter.login("selfservice", "password");
 
         verify(view).showProgress();
-        verify(view).onLoginSuccess(user.getUserName());
+        verify(view).onLoginSuccess(user.getUsername());
     }
 
     @Test
